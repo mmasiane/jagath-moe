@@ -1,0 +1,437 @@
+commit e6e96a53e26f7a41f61bd13e2112fe0a7a1f1e7a
+Author: Kishor Patil <kpatil@yahoo-inc.com>
+Date:   Fri Feb 12 19:08:13 2016 -0600
+
+    Fixing auto login module tests
+    
+    Conflicts:
+    	storm-core/test/clj/backtype/storm/security/auth/auto_login_module_test.clj
+
+commit 2ab6a84eb8715d2e6a4514bf079b8d893f6d15f7
+Author: Kishor Patil <kpatil@yahoo-inc.com>
+Date:   Fri Feb 12 16:39:57 2016 -0600
+
+    Fixing Kerberos TGT failure issues caused by  sharing single instance by multiple subjects
+    
+    Conflicts:
+    	storm-core/src/jvm/backtype/storm/security/auth/AuthUtils.java
+    	storm-core/src/jvm/backtype/storm/security/auth/kerberos/AutoTGT.java
+    	storm-core/src/jvm/backtype/storm/security/auth/kerberos/AutoTGTKrb5LoginModule.java
+
+commit 765e4c2fabafbfe31fb0f43e5b670fd3b91d1a2e
+Merge: a11fcc3 2aaa718
+Author: Parth Brahmbhatt <brahmbhatt.parth@gmail.com>
+Date:   Wed Apr 1 10:44:56 2015 -0700
+
+    Merge remote-tracking branch 'apache/master' into nimbus-ha
+    
+    Conflicts:
+    	storm-core/src/jvm/backtype/storm/utils/NimbusClient.java
+    	storm-core/test/clj/backtype/storm/security/auth/nimbus_auth_test.clj
+
+commit 575871822b116608f47a0a7a4cd3b4b17df9a672
+Merge: f7205d2 bb8d48d
+Author: Parth Brahmbhatt <brahmbhatt.parth@gmail.com>
+Date:   Thu Mar 19 15:04:43 2015 -0700
+
+    Merge remote-tracking branch 'upstream/master' into STORM-166
+    
+    Conflicts:
+    	conf/defaults.yaml
+    	storm-core/src/clj/backtype/storm/cluster.clj
+    	storm-core/src/clj/backtype/storm/daemon/nimbus.clj
+    	storm-core/src/clj/backtype/storm/ui/core.clj
+    	storm-core/test/clj/backtype/storm/cluster_test.clj
+    	storm-core/test/clj/backtype/storm/security/auth/auth_test.clj
+
+commit 2666d9907bcf3e517dcafe8a5b3c17d33f05b8ec
+Merge: 30a0130 5ff1414
+Author: Sriharsha Chintalapani <harsha@hortonworks.com>
+Date:   Sun Mar 8 11:07:14 2015 -0700
+
+    Merge branch 'drpc-port-on-security' of https://github.com/Lewuathe/storm into STORM-653
+
+commit 888d60fe824f13a35970e0d9ef0f081dc01a6c01
+Merge: fc6d6dd 95211d7
+Author: Derek Dagit <derekd@yahoo-inc.com>
+Date:   Tue Feb 17 11:14:07 2015 -0600
+
+    Merge branch 'security_typo_fixes' of https://github.com/harisekhon/storm
+    
+    STORM-673 Typo 'deamon' in security documentation
+
+commit e3ee3a3c3f3f8da03dcecf2c7cd617ec6826b445
+Author: Sriharsha Chintalapani <mail@harsha.io>
+Date:   Mon Feb 2 16:49:40 2015 -0800
+
+    STORM-640. Storm UI vulnerable to poodle attack.
+
+commit 6b0da1689525507d2f40823abb50de3a4a1f9607
+Merge: 88e70a8 23e630b
+Author: Parth Brahmbhatt <brahmbhatt.parth@gmail.com>
+Date:   Tue Dec 16 18:14:32 2014 -0800
+
+    Merge remote-tracking branch 'upstream/master' into STORM-166
+    
+    Conflicts:
+    	conf/defaults.yaml
+    	pom.xml
+    	storm-core/src/clj/backtype/storm/cluster.clj
+    	storm-core/src/clj/backtype/storm/daemon/nimbus.clj
+    	storm-core/src/clj/backtype/storm/thrift.clj
+    	storm-core/src/clj/backtype/storm/ui/core.clj
+    	storm-core/src/jvm/backtype/storm/Config.java
+    	storm-core/src/jvm/backtype/storm/utils/NimbusClient.java
+    	storm-core/test/clj/backtype/storm/nimbus_test.clj
+    	storm-core/test/clj/backtype/storm/security/auth/auth_test.clj
+    	storm-core/test/clj/backtype/storm/utils_test.clj
+
+commit 635c9b2efea767256527c6bbde16c37b8d7fd47d
+Author: Parth Brahmbhatt <brahmbhatt.parth@gmail.com>
+Date:   Mon Dec 8 15:39:25 2014 -0800
+
+    Added security login for HDFSCodeDistributor so it would work with secure and non secure HDFS.
+    Removed couple of TODOs from BitTorrentCodeDistributor.
+
+commit 413a6952c2acabdb97a9e4d68eaa774faafc120b
+Merge: 64f06c7 e6b1886
+Author: Robert (Bobby) Evans <evans@yahoo-inc.com>
+Date:   Thu Nov 13 12:47:07 2014 -0600
+
+    Merge branch 'security'
+
+commit e6b18863e1cc5a5af8c7d1da703d31d9e17b70bf
+Merge: 04a7937 e15dbe2
+Author: Robert (Bobby) Evans <evans@yahoo-inc.com>
+Date:   Wed Nov 12 10:43:41 2014 -0600
+
+    Merge branch 'master' into security-upmerge
+    
+    Conflicts:
+    	storm-core/src/clj/backtype/storm/testing.clj
+    	storm-core/src/jvm/backtype/storm/utils/LocalState.java
+
+commit ea0b8a2a51332020a569ed7aeb3e0647477af763
+Merge: 4788c7e cfe7e63
+Author: Robert (Bobby) Evans <evans@yahoo-inc.com>
+Date:   Wed Oct 15 11:05:10 2014 -0500
+
+    Merge branch 'master' into security-upmerge
+    
+    Conflicts:
+    	storm-core/src/clj/backtype/storm/daemon/supervisor.clj
+    	storm-core/src/clj/backtype/storm/ui/core.clj
+    	storm-core/src/ui/public/templates/topology-page-template.html
+    	storm-core/test/clj/backtype/storm/supervisor_test.clj
+
+commit 84002179cf7ae5879c93e900f64a7e576ce4cce1
+Merge: 02f6db5 d45c187
+Author: Sriharsha Chintalapani <mail@harsha.io>
+Date:   Mon Sep 29 10:17:06 2014 -0700
+
+    Merge remote-tracking branch 'upstream/security' into security
+
+commit 154ec7b6daec34c6289eaed1846d6bfba809f6ab
+Merge: aa6e7ed cfcedcf
+Author: Robert (Bobby) Evans <evans@yahoo-inc.com>
+Date:   Wed Sep 24 12:55:04 2014 -0500
+
+    Merge branch 'master' into security-upmerge
+    
+    Conflicts:
+    	storm-core/src/jvm/backtype/storm/messaging/netty/Client.java
+    	storm-core/src/jvm/backtype/storm/utils/Utils.java
+    	storm-core/src/ui/public/templates/component-page-template.html
+    	storm-core/src/ui/public/templates/index-page-template.html
+    	storm-core/src/ui/public/templates/topology-page-template.html
+
+commit c7fe9ef97962b7cd0eae11754d2bfbdd473139a9
+Merge: b62d71d b19fdbb
+Author: Parth Brahmbhatt <brahmbhatt.parth@gmail.com>
+Date:   Fri Aug 29 09:52:23 2014 -0700
+
+    Merge remote-tracking branch 'upstream/security' into STORM-406
+    
+    Conflicts:
+    	STORM-UI-REST-API.md
+
+commit 84b7deaa5badc07b7ea8a88fef589577c837f8ee
+Merge: 7a06ef7 d9b68ab
+Author: Robert (Bobby) Evans <bobby@apache.org>
+Date:   Thu Aug 28 13:48:29 2014 -0500
+
+    Merge branch 'master' into security-upmerge
+    
+    Conflicts:
+    	README.markdown
+    	conf/defaults.yaml
+    	pom.xml
+    	storm-core/src/clj/backtype/storm/daemon/common.clj
+    	storm-core/src/clj/backtype/storm/daemon/supervisor.clj
+    	storm-core/src/clj/backtype/storm/ui/core.clj
+    	storm-core/src/jvm/backtype/storm/Config.java
+    	storm-core/src/jvm/backtype/storm/utils/Utils.java
+    	storm-core/test/clj/backtype/storm/supervisor_test.clj
+
+commit b62d71d6696163134ca19e71e55cbc96fde0524d
+Merge: dd59ad4 7a06ef7
+Author: Parth Brahmbhatt <brahmbhatt.parth@gmail.com>
+Date:   Tue Aug 26 15:11:21 2014 -0700
+
+    Merge remote-tracking branch 'upstream/security' into STORM-406
+    
+    Conflicts:
+    	storm-core/pom.xml
+    	storm-core/src/clj/backtype/storm/ui/core.clj
+
+commit d20c101fa73c413b8d9fe1065a0291125e18bc96
+Merge: a55d792 7a58c2d
+Author: Robert (Bobby) Evans <bobby@apache.org>
+Date:   Mon Aug 18 14:25:07 2014 -0500
+
+    Merge branch 'master' into security-upemerge
+    
+    Conflicts:
+    	README.markdown
+    	storm-core/src/ui/public/templates/index-page-template.html
+    	storm-core/src/ui/public/templates/topology-page-template.html
+
+commit 4ee22b1383fe14bfc852a0bcd8bf7b391ed47f27
+Author: Parth Brahmbhatt <brahmbhatt.parth@gmail.com>
+Date:   Sun Aug 17 14:56:27 2014 -0700
+
+    STORM-460: Fix for storm CSRF vulnerability using ring-anti-forgery.
+
+commit 576726292a88c67aa9e9ba7563de114540487f54
+Author: Parth Brahmbhatt <brahmbhatt.parth@gmail.com>
+Date:   Sun Aug 17 14:56:27 2014 -0700
+
+    STORM-406: Fix for storm CSRF vulnerability using ring-anti-forgery.
+
+commit 9d0b61804a17c3edb6d9b12f64655533ee77b38c
+Merge: cf5fc0c 6d0311f
+Author: Robert (Bobby) Evans <bobby@apache.org>
+Date:   Wed Jul 30 18:55:51 2014 -0500
+
+    Merge branch 'show-recent-error-security' of https://github.com/kishorvpatil/incubator-storm into STORM-366
+    
+    Conflicts:
+    	STORM-UI-REST-API.md
+    
+    STORM-366: Add color span to most recent error and fix ui templates for security.
+
+commit 02e79499fa381b56f8a5333e00cf0cc0bd7aa252
+Merge: 19ad135 559c883
+Author: Raghavendra Nandagopal <speaktoraghav@gmail.com>
+Date:   Tue Jul 29 16:37:50 2014 -0700
+
+    Merge remote-tracking branch 'upstream/security' into security
+    
+    Conflicts:
+    	conf/defaults.yaml
+    	storm-core/src/jvm/backtype/storm/Config.java
+
+commit 559c883d5331362808b7e1ada647cbac76a88ab3
+Merge: ff8336b b2a8a77
+Author: Robert (Bobby) Evans <bobby@apache.org>
+Date:   Tue Jul 29 15:57:03 2014 -0500
+
+    Merge branch 'master' into security-upmerge
+    
+    Conflicts:
+    	bin/storm
+    	conf/defaults.yaml
+    	storm-core/src/clj/backtype/storm/daemon/drpc.clj
+    	storm-core/src/clj/backtype/storm/daemon/logviewer.clj
+    	storm-core/src/clj/backtype/storm/daemon/nimbus.clj
+    	storm-core/src/clj/backtype/storm/daemon/supervisor.clj
+    	storm-core/src/clj/backtype/storm/daemon/worker.clj
+    	storm-core/src/clj/backtype/storm/testing.clj
+    	storm-core/src/clj/backtype/storm/ui/helpers.clj
+    	storm-core/src/clj/backtype/storm/util.clj
+    	storm-core/src/jvm/backtype/storm/Config.java
+    	storm-core/src/jvm/backtype/storm/utils/Utils.java
+    	storm-core/src/ui/public/component.html
+    	storm-core/test/clj/backtype/storm/supervisor_test.clj
+
+commit 4a4a298f66270a9edc9a0a5554824d5b616b0cfd
+Merge: 7bb8ec6 642ed74
+Author: Kishor Patil <kpatil@yahoo-inc.com>
+Date:   Fri Jul 18 20:48:54 2014 +0000
+
+    Merge branch 'security' into show-recent-error-security
+
+commit f4bc21d3ec13450a0892b91158d42ec273e15d13
+Merge: 28c168f ae5d0c3
+Author: Robert (Bobby) Evans <bobby@apache.org>
+Date:   Wed Jul 9 12:44:25 2014 -0500
+
+    Merge branch 'STORM-395' into security
+    
+    STORM-395: Use TBinaryProtocol without max buffer on security
+
+commit 00e80e9a132764d4b73737d2f7a52282e5247856
+Merge: 3c6930d 28c168f
+Author: Parth Brahmbhatt <brahmbhatt.parth@gmail.com>
+Date:   Mon Jul 7 11:43:59 2014 -0700
+
+    Merge remote-tracking branch 'upstream/security' into security
+
+commit ed3d42d1afa2759b667dff3e4bd77d2dce79805e
+Author: P. Taylor Goetz <ptgoetz@gmail.com>
+Date:   Thu Jun 26 15:19:50 2014 -0400
+
+    changed hdfs security config keys to hdfs.*
+
+commit 28c168fd7d0272f88d586f6f572eab937b874f22
+Author: Kishor Patil <kpatil@yahoo-inc.com>
+Date:   Tue Jun 24 19:12:56 2014 +0000
+
+    Add check for empty table before sorting on security
+
+commit 357fd09dff8eec1f224d7f00f5344931ec2b64df
+Author: Kishor Patil <kpatil@yahoo-inc.com>
+Date:   Mon Jun 23 16:13:34 2014 +0000
+
+    Add color span to most recent error and fix ui templates for security.
+
+commit 65aee65af54dd29434af8f5ee403233b597561b6
+Merge: d7c1d1d 79f258e
+Author: Robert (Bobby) Evans <bobby@apache.org>
+Date:   Mon Jun 23 10:18:38 2014 -0500
+
+    Merge branch 'master' into security
+    
+    Conflicts:
+    	storm-core/src/clj/backtype/storm/cluster.clj
+    	storm-core/src/clj/backtype/storm/ui/core.clj
+    	storm-core/test/clj/backtype/storm/cluster_test.clj
+
+commit d7c1d1d0a909079a370ed35aaac91668eef33a22
+Merge: 79089ad c545b9d
+Author: Robert (Bobby) Evans <bobby@apache.org>
+Date:   Mon Jun 23 09:31:41 2014 -0500
+
+    Merge branch 'node-on-error-security' of https://github.com/kishorvpatil/incubator-storm into STORM-360-security
+    
+    STORM-360: Add node details for Error Topology and Component pages on security
+
+commit 79089ad0da80e38eb36b7ea91be8b43795dc4efb
+Merge: 87cdbf5 24d4a14
+Author: Robert (Bobby) Evans <bobby@apache.org>
+Date:   Thu Jun 19 16:04:02 2014 -0500
+
+    Merge tag 'v0.9.2-incubating' into security
+    
+    [maven-release-plugin]  copy for tag v0.9.2-incubating
+    
+    Conflicts:
+    	storm-core/pom.xml
+
+commit ea946d04dcb6df8e65dbf16500a361eaaba13432
+Author: Kishor Patil <kpatil@yahoo-inc.com>
+Date:   Wed Jun 18 23:58:33 2014 +0000
+
+    Show node details on errors for STORM-360 on security
+
+commit 92e3a5742374a3a7c3aae20cbeda32ce7b033526
+Merge: a762f1c 0826b93
+Author: Robert (Bobby) Evans <bobby@apache.org>
+Date:   Thu Jun 12 16:09:57 2014 -0500
+
+    Merge branch 'master' into security-upmerge
+    
+    Conflicts:
+    	storm-core/src/clj/backtype/storm/LocalCluster.clj
+    	storm-core/src/clj/backtype/storm/cluster.clj
+    	storm-core/src/clj/backtype/storm/config.clj
+    	storm-core/src/clj/backtype/storm/daemon/drpc.clj
+    	storm-core/src/clj/backtype/storm/testing.clj
+    	storm-core/src/clj/backtype/storm/testing4j.clj
+    	storm-core/src/clj/backtype/storm/thrift.clj
+    	storm-core/src/clj/backtype/storm/ui/core.clj
+    	storm-core/src/clj/backtype/storm/util.clj
+    	storm-core/src/clj/backtype/storm/zookeeper.clj
+
+commit 41615b3c4b174077ac1c729af4aef32e5b79d3c5
+Merge: 2131a0a 2a60e99
+Author: Robert (Bobby) Evans <bobby@apache.org>
+Date:   Thu Jun 12 10:59:46 2014 -0500
+
+    Merge branch 'master' into security
+
+commit 118b9221b492ed8b91e6633c3cfb748bc1b82790
+Merge: 0a98bee 4db4514
+Author: Robert (Bobby) Evans <bobby@apache.org>
+Date:   Wed Jun 11 11:10:04 2014 -0500
+
+    Merge branch 'master' into security
+
+commit 0a98bee214b46ed20b566a9b49c3eca2895f9fd5
+Merge: 6592b82 c89fb82
+Author: Robert (Bobby) Evans <bobby@apache.org>
+Date:   Wed Jun 11 11:07:59 2014 -0500
+
+    Merge branch 'master' into security-upmerge
+    
+    Conflicts:
+    	.gitignore
+    	storm-core/src/clj/backtype/storm/daemon/drpc.clj
+    	storm-core/src/clj/backtype/storm/daemon/executor.clj
+    	storm-core/src/clj/backtype/storm/daemon/logviewer.clj
+    	storm-core/src/clj/backtype/storm/daemon/worker.clj
+    	storm-core/src/clj/backtype/storm/timer.clj
+    	storm-core/src/clj/backtype/storm/ui/core.clj
+    	storm-core/src/clj/backtype/storm/ui/helpers.clj
+    	storm-core/src/clj/backtype/storm/util.clj
+    	storm-core/src/jvm/backtype/storm/Config.java
+    	storm-core/src/jvm/backtype/storm/utils/Utils.java
+
+commit 698bb9c9788b82d4127d861fb3ecf06a06b683c2
+Merge: ce6e5d2 bfdce7a
+Author: Robert (Bobby) Evans <bobby@apache.org>
+Date:   Wed May 28 08:45:22 2014 -0500
+
+    Merge branch 'master' into security
+
+commit fe5f41aa8332700d3f98422cb7d986fc47289bcd
+Author: Robert (Bobby) Evans <bobby@apache.org>
+Date:   Wed May 21 11:03:11 2014 -0500
+
+    STORM-216: Added Authentication and Authorization.
+    
+    This is an upmerged version of https://github.com/yahoo/incubator-storm/tree/security
+
+commit 248dc8ad7ec6ec23a5ae4efab7bfa6f93ab6a058
+Merge: 5b4bb31 bc76878
+Author: P. Taylor Goetz <ptgoetz@gmail.com>
+Date:   Wed May 7 11:06:25 2014 -0400
+
+    Merge branch 'security-info' of github.com:revans2/incubator-storm
+
+commit bc76878f0ea08e9b853e342ca92211373346bb4e
+Author: Robert (Bobby) Evans <evans@yahoo-inc.com>
+Date:   Thu May 1 13:54:03 2014 -0500
+
+    Added in security documentation.
+
+commit 61eee4da6533f3131dd0f875f620c5784baa816f
+Merge: 2b0cedd c75dbf3
+Author: Nathan Marz <nathan@nathanmarz.com>
+Date:   Mon Apr 1 21:38:57 2013 -0700
+
+    Merge remote-tracking branch 'd2r/d2r-security-related-tests'
+
+commit c75dbf3fd7e78f0f8c47019942464a2444c6bcd3
+Author: Derek Dagit <derekd@yahoo-inc.com>
+Date:   Wed Mar 27 19:36:40 2013 +0000
+
+    Add tests for code from security changes
+    
+    Add tests for SerializationFactory, utils, SaslTransportPlugin
+    ThriftClient, ThriftServer, AuthUtils and ReqContext.
+    
+    Removes error log message in SerializationFactory before throwing
+    RuntimeException.
+    
+    Introduces dev dependency on Mockito for certain tests.

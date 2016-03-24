@@ -1,0 +1,64 @@
+commit 7ddc078e68d645bac2829de9634e3373a59be551
+Author: Aljoscha Krettek <aljoscha.krettek@gmail.com>
+Date:   Wed Feb 17 12:34:51 2016 +0100
+
+    [FLINK-3418] Don't run RocksDB copy utils in external process
+    
+    This was causing to many problems with security tokens and yarn. Now,
+    let the RocksDB backup run in a thread but
+    don't interrupt these Threads anymore on closing. The Threads will close
+    themselves because the copy operation will fail because of a
+    FileNotFoundException when the state directories are being cleaned up.
+    
+    This also removes the ExternalProcessRunner because it is not needed
+    anymore and using it causes too many headaches.
+    
+    This closes #1687.
+
+commit 206120631d97898c9396d74b2450eb36af17e06a
+Author: tedyu <yuzhihong@gmail.com>
+Date:   Wed Nov 18 13:56:31 2015 -0800
+
+    [FLINK-3005] [core] Bump commons-collections version to fix object deserialization remote command execution vulnerability
+    
+    This closes #1381
+
+commit b264b010062575428f7301a31495df0171c9505e
+Author: Robert Metzger <rmetzger@apache.org>
+Date:   Thu Aug 20 18:43:04 2015 +0200
+
+    [FLINK-2555] Properly pass security credentials in the Hadoop Input/Output format wrappers
+    
+    This is needed because the Hadoop IF/OF's are using Hadoop's FileSystem stack, which is using
+    the security credentials passed in the JobConf / Job class in the getSplits() method.
+    
+    Note that access to secured Hadoop 1.x using Hadoop IF/OF's is not possible with this change.
+    This limitation is due to missing methods in the old APIs.
+    
+    - Add some comments & change dependency scope to test
+
+commit ddc1dc9da5b2cf6b0b54b943510d6ddb35fa4657
+Author: Robert Metzger <metzgerr@web.de>
+Date:   Sun Feb 23 11:04:11 2014 +0100
+
+    [yarn] Major YARN-Client improvements
+    - HDFS security token support
+    - "ship/" directory to transfer files to all TaskManagers (user-files)
+    - Log4j-based logging (YARN now respects the logging configuration)
+    - the YARN-client deletes all "temp" files from HDFS.
+    - The JVMs started by YARN now respect the configured JVM opts in the yaml-file
+    - the JobManager webinterface shows the log file (e.g it is aware of the YARN-specific log-directory)
+    - The YARN-client now creates a hidden ".yarn-jobmanager" with the address of the JobManager in YARN. users do not have to specify the -m argument anymore.
+    - Fix a little bug with the JobManager's "cloud" model for taskManager with less that 1GB memory.
+    - Tested on Cloudera Hadoop 5 Beta 2
+    - Tested on Cloduera Hadoop 5 Beta 2 WITH CDH5-B2 Maven Dependencies.
+    - Tested on Hadoop 2.2.0
+    - Tested on Amazon EMR
+
+commit 54a645f6a2bed827f31b7d71629bf4892c1eb906
+Author: Fabian Hueske <fabian.hueske@tu-berlin.de>
+Date:   Sat Feb 19 14:23:24 2011 +0100
+
+    - NepheleMiniClusterITCase brings down Nephele and MiniDFS after test
+    - Removed clearFS() method for security reasons
+    - Removed deprecated numTaskTrackers argument from NepheleMiniCluster

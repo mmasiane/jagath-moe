@@ -1,0 +1,144 @@
+commit 8e38b7ede6756feda759db28f876f70d484e4320
+Author: Rossen Stoyanchev <rstoyanchev@gopivotal.com>
+Date:   Tue Jul 29 16:55:33 2014 -0400
+
+    Add section on web security
+    
+    Issue: SPR-6125
+
+commit e4ad2b352e35a0cdbc5d4834f9689a13162c8d19
+Author: Rossen Stoyanchev <rstoyanchev@gopivotal.com>
+Date:   Tue Jan 21 11:50:04 2014 -0500
+
+    Add DestinationUserNameProvider interface
+    
+    The interface is to be implemented in addition to
+    java.security.Principal when Principal.getName() is not globally unique
+    enough for use in user destinations.
+    
+    Issue: SPR-11327
+
+commit 5311e84c64cb453e3779a4f235c5030b7c569edd
+Author: Arjen Poutsma <apoutsma@gopivotal.com>
+Date:   Fri Aug 9 13:02:27 2013 +0200
+
+    Added XStream CatchAllConverter
+    
+    Added XStream CatchAllConverter that supports all classes, but throws
+    exceptions for (un)marshalling.
+    
+    Main purpose of this class is to register this converter as a catchall
+    last converter with a normal or higher priority in addition to
+    converters that explicitly  support the domain classes that should be
+    supported. As a result, default XStream  converters with lower
+    priorities and possible security vulnerabilities do not get invoked.
+
+commit 7576274874deeccb6da6b09a8d5bd62e8b5538b7
+Author: Arjen Poutsma <apoutsma@gopivotal.com>
+Date:   Tue Aug 6 15:04:09 2013 -0700
+
+    Fix potential security risk when using Spring OXM
+    
+    Disable by default external entity resolution when using Spring OXM
+    with jaxb. This prevents a XML entity from being able to resolve a
+    local file on the host system.
+    
+    See:
+    https://www.owasp.org/index.php/XML_External_Entity_(XXE)_Processing
+    
+    Issue: SPR-10806
+
+commit 4da7e304b86c9528d05b51b02459ee071b65e68a
+Author: Arjen Poutsma <apoutsma@gopivotal.com>
+Date:   Wed Jul 24 15:54:32 2013 +0200
+
+    Additional docs about security vulnerabilities with XStream.
+
+commit 8e7622bb8a6a078d92531b657f105cec953c4166
+Author: Phillip Webb <pwebb@vmware.com>
+Date:   Fri Sep 7 11:49:06 2012 -0700
+
+    Fix Windows-related build issues
+    
+    - Increase max heap size in gradle wrapper.
+    - Use MockProperties implementation to protect against security
+      exceptions.
+    - Replace windows CRLF with LF in various tests.
+    - Increase Thread.sleep times to account for lack of precision on
+      Windows.
+    
+    Issue: SPR-9717
+
+commit ee36c80ca961a5b2af233cd26a5483d57939c0af
+Merge: 3eff364 0a5392e
+Author: Chris Beams <cbeams@vmware.com>
+Date:   Mon Feb 13 15:17:30 2012 +0100
+
+    Sync with 3.1.x
+    
+    * 3.1.x: (61 commits)
+      Compensate for changes in JDK 7 Introspector
+      Avoid 'type mismatch' errors in ExtendedBeanInfo
+      Polish ExtendedBeanInfo and tests
+      Infer AnnotationAttributes method return types
+      Minor fix in MVC reference doc chapter
+      Hibernate 4.1 etc
+      TypeDescriptor equals implementation accepts annotations in any order
+      "setBasenames" uses varargs now (for programmatic setup; SPR-9106)
+      @ActiveProfiles mechanism works with @ImportResource as well (SPR-8992
+      polishing
+      clarified Resource's "getFilename" method to consistently return null
+      substituteNamedParameters detects and unwraps SqlParameterValue object
+      Replace spaces with tabs
+      Consider security in ClassUtils#getMostSpecificMethod
+      Adding null check for username being null.
+      Improvements for registering custom SQL exception translators in app c
+      SPR-7680 Adding QueryTimeoutException to the DataAccessException hiera
+      Minor polish in WebMvcConfigurationSupport
+      Detect overridden boolean getters in ExtendedBeanInfo
+      Polish ExtendedBeanInfoTests
+      ...
+
+commit 45ad1833315415022a3cefa54f4df531815e41e8
+Author: Chris Beams <cbeams@vmware.com>
+Date:   Fri Feb 10 00:11:12 2012 +0100
+
+    Consider security in ClassUtils#getMostSpecificMethod
+    
+    Recent changes in ExtendedBeanInfo involve invoking
+    ClassUtils#getMostSpecificMethod when determining JavaBeans get/set
+    pairs; if Java security settings control disallow reflective access,
+    this results in an AccessControlException.
+    
+    This change defends against this (comparatively rare) scenario by
+    catching the exception and falling back to returning the method
+    originally supplied by the user.
+    
+    This change was a result of noticing CallbacksSecurityTests failing
+    following the ExtendedBeanInfo modifications mentioned above
+    
+    Issue: SPR-8949
+
+commit f4a2282d9d9f6e58029022c58311a1db07f7defc
+Author: Juergen Hoeller <jhoeller@vmware.com>
+Date:   Wed Jan 26 20:30:30 2011 +0000
+
+    LocaleChangeInterceptor validates locale values in order to prevent XSS vulnerability (SPR-7779)
+
+commit 0179c66d2abf2de251808fe45ce0362dd469454b
+Author: Costin Leau <cleau@vmware.com>
+Date:   Mon Aug 24 15:53:48 2009 +0000
+
+    + add security manager checks to avoid the creation of inner privileged action classes
+
+commit af8af8c633ba016eca671bc9468eba006e8834b1
+Author: Costin Leau <cleau@vmware.com>
+Date:   Thu Aug 6 22:31:57 2009 +0000
+
+    + added fine grained privileged blocks to preserve the caller security stack when invoking the callee
+
+commit d5d3104b7b13ce249bf9c877f7160cd2137ec209
+Author: Costin Leau <cleau@vmware.com>
+Date:   Thu Aug 6 16:34:39 2009 +0000
+
+    + interaction with user code uses now dedicated privileged when running under a security manager

@@ -1,0 +1,15 @@
+commit 51a1bf6b5e7de0d0d92ddb4b8f3a7114ba9ed50b
+Author: Mahadev Konar <mahadev@apache.org>
+Date:   Mon Feb 6 08:34:22 2012 +0000
+
+    ZOOKEEPER-1373. Hardcoded SASL login context name clashes with Hadoop security  configuration override. (Eugene Koontz and Thomas Weise via mahadev)
+    
+    git-svn-id: https://svn.apache.org/repos/asf/zookeeper/trunk@1240918 13f79535-47bb-0310-9956-ffa450edef68
+
+commit da66dcc2ac74d52e08555472c05ddf6901d8f4cb
+Author: Patrick D. Hunt <phunt@apache.org>
+Date:   Mon Feb 7 19:26:47 2011 +0000
+
+    ZOOKEEPER-902. Fix findbug issue in trunk "Malicious code vulnerability"
+    
+    git-svn-id: https://svn.apache.org/repos/asf/zookeeper/trunk@1068067 13f79535-47bb-0310-9956-ffa450edef68
