@@ -1,0 +1,49 @@
+jagsi@jagsi-PC MINGW64 ~/Documents/Virginia Tech/Software Engineering/Project/guava (master)
+$ git log --grep="security";
+commit 80b78c8ba68e32963e1684787a10b7f78c91e81a
+Author: cpovirk <cpovirk@google.com>
+Date:   Fri Oct 9 10:50:04 2015 -0700
+
+    1. Omit sun.security.* methods from our Android tests.
+    That package isn't available there (at least at compile time, presumably at all).
+
+    2. Accept NPE instead of IAE when given an empty key.
+    I didn't dig enough to figure out whether this was an Android bug or a spec ambiguity.
+    -------------
+    Created by MOE: https://github.com/google/moe
+    MOE_MIGRATED_REVID=105070193
+
+commit 3df4c67da61c5fdda14db0e9789ac18a32fb3f31
+Author: emcmanus <emcmanus@google.com>
+Date:   Fri Jun 5 14:40:45 2015 -0700
+
+    Remove the test code from TypesTest that tries to ensure that Types.newTypeVariable functions correctly in the presence of a SecurityManager.
+
+    It isn't really possible to test this fully given that the security-sensitive operation happens in a static initializer.
+    -------------
+    Created by MOE: http://code.google.com/p/moe-java
+    MOE_MIGRATED_REVID=95325181
+
+commit 34f3e9f690dfd6f8352f30647c020ecc72ec5078
+Author: emcmanus <emcmanus@google.com>
+Date:   Fri Mar 13 13:15:30 2015 -0700
+
+    In com.google.common.reflect.Types, make the Method objects that are used as part of Java compatibility accessible.
+
+    Making them accessible should not be necessary, since they are being used to access package-private methods from elsewhere in the same package. But having them not accessible trips over an unfixable race condition in App Engine. There, the security layer intercepts reflective operation and ultimately ends up invoking the Method from another package. To make this work it has to do Method.setAccessible(true) in a try/finally. But if two threads end up doing this at the same time then one may set the Method back to inaccessible just after the other has set it accessible. Making the Method always accessible avoids this problem. It is not any kind of security problem since the methods in question are harmless and the only reason they are not public is to avoid polluting the API.
+
+    http://www.artima.com/weblogs/viewpost.jsp?thread=164042
+    -------------
+    Created by MOE: http://code.google.com/p/moe-java
+    MOE_MIGRATED_REVID=88573029
+
+commit ba9aa6be61a9de6096a0d571ae9fde97e57d539a
+Author: Kurt Kluever <kak@google.com>
+Date:   Fri Oct 26 16:23:10 2012 -0400
+
+    Add RangeMap.getEntry method.
+
+    This appears to be needed by https://cs.[]/#[]/java/com/google/net/security/[]proxy/ProxyConfigFile.java&l=583 .
+    -------------
+    Created by MOE: http://code.google.com/p/moe-java
+    MOE_MIGRATED_REVID=36676148

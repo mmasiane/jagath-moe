@@ -1,0 +1,11 @@
+jagsi@jagsi-PC MINGW64 ~/Documents/Virginia Tech/Software Engineering/Project/junit4 (master)
+$ git log --all --grep="security";
+commit 1d97da73fdafce8f5cf9d722f23c5cba41b26b70
+Author: Stefan Birkner <mail@stefan-birkner.de>
+Date:   Sat Apr 5 22:24:27 2014 +0200
+
+    Verify that test classes are public.
+
+    Test classes should be public in order to avoid problems with
+    reflection caused by the security manager. Public classes are always
+    accesible.

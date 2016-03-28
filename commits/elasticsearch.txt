@@ -1,0 +1,752 @@
+jagsi@jagsi-PC MINGW64 ~/Documents/Virginia Tech/Software Engineering/Project/elasticsearch (master)
+$ git log --all --grep="security";
+commit d5e408b27329955bd5e1e7dd380f0b2ae9dbcc10
+Author: Jason Tedor <jason@tedor.me>
+Date:   Tue Mar 22 15:31:11 2016 -0400
+
+    Mock rlimit infinity in virtual memory size test
+
+    This commit mocks the value of rlimit infinity in the max size virtual
+    memory check test. This is to avoid attempting to load the native C
+    library during the test on Windows which would lead to a permissions
+    violation (the native C library needs to be loaded before the security
+    manager is setup).
+
+commit 202c761131c01011d738d7b1c807c080278adca5
+Author: Clinton Gormley <clint@traveljury.com>
+Date:   Thu Mar 17 14:13:19 2016 +0100
+
+    Clarify how `-Djava.security.policy=someURL` must be passed
+
+    Closes #17160
+
+commit 07a8ba8deb6faa0e8255f321bc12033a9cf0fe26
+Author: Clinton Gormley <clint@traveljury.com>
+Date:   Thu Mar 17 14:13:19 2016 +0100
+
+    Clarify how `-Djava.security.policy=someURL` must be passed
+
+    Closes #17160
+
+commit 8301091d96d108f7a8f5dba42e22b71ba9f8713f
+Author: Clinton Gormley <clint@traveljury.com>
+Date:   Thu Mar 17 14:13:19 2016 +0100
+
+    Clarify how `-Djava.security.policy=someURL` must be passed
+
+    Closes #17160
+
+commit bd059b8cc3c8e28a5a9866621f96e3c36f9a8ee7
+Author: Clinton Gormley <clint@traveljury.com>
+Date:   Thu Mar 17 14:13:19 2016 +0100
+
+    Clarify how `-Djava.security.policy=someURL` must be passed
+
+    Closes #17160
+
+commit 6deabac8e8549cc7f01584144f40001492baa7cf
+Author: David Pilato <david@pilato.fr>
+Date:   Thu Mar 10 10:57:59 2016 +0100
+
+    Can not extract text from Office documents (`.docx` extension)
+
+    Add REST test for:
+
+    * `.doc`
+    * `.docx`
+
+    The later fails with:
+
+    ```
+    ==> Test Info: seed=DB93397128B876D4; jvm=1; suite=1
+    Suite: org.elasticsearch.ingest.attachment.IngestAttachmentRestIT
+      2> REPRODUCE WITH: gradle :plugins:ingest-attachment:integTest -Dtests.seed=DB93397128B876D4 -Dtests.class=org.elasticsearch.ingest.attachment.IngestAttachmentRestIT -Dtests.method="test {yaml=ingest_attachment/30_files_supported/Test ingest attachment processor with .docx file}" -Des.logger.level=WARN -Dtests.security.manager=true -Dtests.locale=bg -Dtests.timezone=Europe/Athens
+    FAILURE 4.53s | IngestAttachmentRestIT.test {yaml=ingest_attachment/30_files_supported/Test ingest attachment processor with .docx file} <<< FAILURES!
+       > Throwable #1: java.lang.AssertionError: expected [2xx] status code but api [index] returned [400 Bad Request] [{"error":{"root_cause":[{"type":"parse_exception","reason":"Error parsing document in field [field1]"}],"type":"parse_exception","reason":"Error parsing document in field [field1]","caused_by":{"type":"tika_exception","reason":"Unexpected RuntimeException from org.apache.tika.parser.microsoft.ooxml.OOXMLParser@7f85baa5","caused_by":{"type":"illegal_state_exception","reason":"access denied (\"java.lang.RuntimePermission\" \"getClassLoader\")","caused_by":{"type":"access_control_exception","reason":"access denied (\"java.lang.RuntimePermission\" \"getClassLoader\")"}}}},"status":400}]
+       >    at __randomizedtesting.SeedInfo.seed([DB93397128B876D4:53C706AB86441B2C]:0)
+       >    at org.elasticsearch.test.rest.section.DoSection.execute(DoSection.java:107)
+       >    at org.elasticsearch.test.rest.ESRestTestCase.test(ESRestTestCase.java:395)
+       >    at java.lang.Thread.run(Thread.java:745)
+    ```
+
+    Related to #16864
+
+commit 95cc3e38fc3c4e7a415473140497fed40394dccc
+Author: Nik Everett <nik9000@gmail.com>
+Date:   Mon Feb 22 01:04:58 2016 -0800
+
+    Check test naming conventions on all modules
+
+    The big win here is catching tests that are incorrectly named and will
+    be skipped by gradle, providing a false sense of security.
+
+    The whole thing takes about 10 seconds on my Macbook Air, not counting
+    compiling the test classes, which seems worth it. Because this runs as
+    a gradle task with propery UP-TO-DATE handling it can be skipped if the
+    tests haven't been changed which should save some time.
+
+    I chose to keep this in test:framework rather than a new subproject of
+    buildSrc because ESIntegTestCase and doesn't inroduce any additional
+    dependencies.
+
+commit d04ec6eb2ca0a3bab9876ada04579bb0772701f4
+Merge: 6f57a6f c505865
+Author: Simon Willnauer <simon.willnauer@elasticsearch.com>
+Date:   Thu Feb 11 17:37:48 2016 +0100
+
+    Merge pull request #16176 from s1monw/make_security_non_optional
+
+    Make security non-optional
+
+commit c50586599ea0041dfb3a31bab39910d8943e3abf
+Author: Simon Willnauer <simonw@apache.org>
+Date:   Fri Jan 22 13:00:50 2016 +0100
+
+    Make security non-optional
+
+    2.x has show so far that running with security manager is the way to go.
+    This commit make this non-optional. Users that need to pass their own rules
+    can still do this via the system configuration for the security manager. They
+    can even opt out of all security that way.
+
+commit e63c87c14a201522a5b2290f6ac435c2fb791817
+Author: Yannick Welsch <yannick@welsch.lu>
+Date:   Tue Feb 9 16:39:42 2016 +0100
+
+    Add permission to access sun.reflect.MethodAccessorImpl from Groovy scripts
+
+    Groovy uses reflection to invoke closures. These reflective calls are optimized by the JVM after "sun.reflect.inflationThreshold" number of invocations.
+    After inflation, access to sun.reflect.MethodAccessorImpl is required from the security manager.
+
+    Closes #16536
+
+commit 8184734974110ee23cf95bc16ae6762ca306aeae
+Author: Yannick Welsch <yannick@welsch.lu>
+Date:   Tue Feb 9 16:39:42 2016 +0100
+
+    Add permission to access sun.reflect.MethodAccessorImpl from Groovy scripts
+
+    Groovy uses reflection to invoke closures. These reflective calls are optimized by the JVM after "sun.reflect.inflationThreshold" number of invocations.
+    After inflation, access to sun.reflect.MethodAccessorImpl is required from the security manager.
+
+    Closes #16536
+
+commit 75da71ff0b4d5f640af760d518c432a0f6a4c691
+Author: Jason Tedor <jason@tedor.me>
+Date:   Tue Feb 9 10:43:10 2016 -0500
+
+    Forbid use of java.security.MessageDigest#clone()
+
+    This commit forbids the usage of java.security.MessageDigest#clone() in
+    favor of getting a thread local instance using
+    org.elasticsearch.common.hash.MessageDigests. This is to prevent running
+    into java.lang.CloneNotSupportedExceptions for message digest providers
+    that do not support clone.
+
+    Closes #16543
+
+commit 380393a5b721e588eb87fabda42153132015987f
+Author: Yannick Welsch <yannick@welsch.lu>
+Date:   Tue Feb 9 16:39:42 2016 +0100
+
+    Add permission to access sun.reflect.MethodAccessorImpl from Groovy scripts
+
+    Groovy uses reflection to invoke closures. These reflective calls are optimized by the JVM after "sun.reflect.inflationThreshold" number of invocations.
+    After inflation, access to sun.reflect.MethodAccessorImpl is required from the security manager.
+
+    Closes #16536
+
+commit 6692e42d9ae944e3ebdd3ef96c4ef40dbbc6b87f
+Author: Robert Muir <rmuir@apache.org>
+Date:   Thu Dec 17 02:35:00 2015 -0500
+
+    thirdPartyAudit round 2
+
+    This fixes the `lenient` parameter to be `missingClasses`. I will remove this boolean and we can handle them via the normal whitelist.
+    It also adds a check for sheisty classes (jar hell with the jdk).
+    This is inspired by the lucene "sheisty" classes check, but it has false positives. This check is more evil, it validates every class file against the extension classloader as a resource, to see if it exists there. If so: jar hell.
+
+    This jar hell is a problem for several reasons:
+
+    1. causes insanely-hard-to-debug problems (like bugs in forbidden-apis)
+    2. hides problems (like internal api access)
+    3. the code you think is executing, is not really executing
+    4. security permissions are not what you think they are
+    5. brings in unnecessary dependencies
+    6. its jar hell
+
+    The more difficult problems are stuff like jython, where these classes are simply 'uberjared' directly in, so you cant just fix them by removing a bogus dependency. And there is a legit reason for them to do that, they want to support java 1.4.
+
+commit 7bca97bba6ac012f875d758cc5f49546396b20e2
+Author: Costin Leau <costin.leau@gmail.com>
+Date:   Wed Nov 25 01:04:40 2015 +0200
+
+    HDFS Snapshot/Restore plugin
+
+    Migrated from ES-Hadoop. Contains several improvements regarding:
+
+    * Security
+    Takes advantage of the pluggable security in ES 2.2 and uses that in order
+    to grant the necessary permissions to the Hadoop libs. It relies on a
+    dedicated DomainCombiner to grant permissions only when needed only to the
+    libraries installed in the plugin folder
+    Add security checks for SpecialPermission/scripting and provides out of
+    the box permissions for the latest Hadoop 1.x (1.2.1) and 2.x (2.7.1)
+
+    * Testing
+    Uses a customized Local FS to perform actual integration testing of the
+    Hadoop stack (and thus to make sure the proper permissions and ACC blocks
+    are in place) however without requiring extra permissions for testing.
+    If needed, a MiniDFS cluster is provided (though it requires extra
+    permissions to bind ports)
+    Provides a RestIT test
+
+    * Build system
+    Picks the build system used in ES (still Gradle)
+
+commit 2169a123a5b3296d47eb87b4f89ecba8a08c20bc
+Author: Robert Muir <rmuir@apache.org>
+Date:   Sat Dec 5 21:46:52 2015 -0500
+
+    Filter classes loaded by scripts
+
+    Since 2.2 we run all scripts with minimal privileges, similar to applets in your browser.
+    The problem is, they have unrestricted access to other things they can muck with (ES, JDK, whatever).
+    So they can still easily do tons of bad things
+
+    This PR restricts what classes scripts can load via the classloader mechanism, to make life more difficult.
+    The "standard" list was populated from the old list used for the groovy sandbox: though
+    a few more were needed for tests to pass (java.lang.String, java.util.Iterator, nothing scary there).
+
+    Additionally, each scripting engine typically needs permissions to some runtime stuff.
+    That is the downside of this "good old classloader" approach, but I like the transparency and simplicity,
+    and I don't want to waste my time with any feature provided by the engine itself for this, I don't trust them.
+
+    This is not perfect and the engines are not perfect but you gotta start somewhere. For expert users that
+    need to tweak the permissions, we already support that via the standard java security configuration files, the
+    specification is simple, supports wildcards, etc (though we do not use them ourselves).
+
+commit 30fe74b5df2cf9f94fc62eb6a90cf15e74f897b2
+Author: Ryan Ernst <ryan@iernst.net>
+Date:   Sat Nov 28 16:54:51 2015 -0800
+
+    Build: Setup standalone tests to compile in intellij
+
+    This adds the standalone tests so they will compile (and thus can be
+    modified with import completion) within IntelliJ. It also explicitly
+    sets up buildSrc as a module.
+
+    Note that this does *not* mean eg evil-tests can be run from intellij.
+    These are special tests that require special settings (eg disabling
+    security manager). They need to be run from the command line.
+
+    closes #15075
+
+commit 30529c008d88f55c2e32e233f31d76b6ee1adda4
+Author: Robert Muir <rmuir@apache.org>
+Date:   Sat Nov 21 22:33:06 2015 -0500
+
+    Ban write access to system properties
+
+    * Forbid System.setProperties & co in forbidden APIs.
+    * Ban property write access at runtime with security manager.
+
+    Plugins that need to modify system properties will need to request permission in their plugin-security.policy
+
+commit 4e2ddced3dbe240588acbca33de4536a6b83311c
+Author: Robert Muir <rmuir@apache.org>
+Date:   Fri Nov 20 15:04:56 2015 -0500
+
+    Java 7 support for the security hacks necessary to deal with encrypted PDFs
+
+commit c07a512376a7b97cafd67c2e652aa9986b3b8a59
+Author: Robert Muir <rmuir@apache.org>
+Date:   Sun Nov 8 01:37:15 2015 -0500
+
+    Lockdown parsers with minimal privileges
+
+    There have been security issues with tika's parsers in the past...
+    let's take away the network, filesystem, everything we can.
+
+    In some way, parsing these docs is a lot like executing untrusted code.
+
+    I know its not pretty, but I think its worth it.
+
+commit f2ee1d79fac141f1723e9815b3736596089bf1b2
+Merge: cdab360 6b831e1
+Author: Robert Muir <rcmuir@gmail.com>
+Date:   Sat Nov 7 18:13:36 2015 -0500
+
+    Merge pull request #185 from rmuir/fix_security_exceptions
+
+    Fix security problems in mapper-attachments.
+
+commit 3c40ed22b3996b800947a977814f41e64e96bc65
+Author: Robert Muir <rmuir@apache.org>
+Date:   Sat Nov 7 17:45:16 2015 -0500
+
+    Fix security problems in mapper-attachments.
+
+    Many of the tests were not running, or did not check the exceptions.
+    I renamed all tests to meet *Tests* so they run, and assert exception messages.
+
+    Also because we must (currently) invoke tika with additional privileges, I added
+    the security logic, and fixed unit testing to call our static method directly.
+
+    This must be package private for security reasons, i simply put everything in
+    org.elasticsearch.mapper.attachments package.
+
+    I upgraded tika to the latest, so we are up to date, and removed logic around
+    tika == null and old locale issues.
+
+commit 3b0bead13a51ab38306d247f8e60ccbdd94e89a8
+Author: Robert Muir <rmuir@apache.org>
+Date:   Sat Nov 7 12:22:12 2015 -0500
+
+    only allow code to bind to the user's configured port numbers/ranges
+
+    Random code shouldn't be listening on sockets elsewhere.
+
+    Today its the wild west, but we only need to grant access to what the user configured.
+
+    This means e.g. multicast plugin has to declare its intentions in its security.policy
+
+    Closes #14549
+
+commit e06cae84f3ca9c43ddb1424268bf9a87a429fdc4
+Author: Robert Muir <rmuir@apache.org>
+Date:   Sat Nov 7 12:22:12 2015 -0500
+
+    only allow code to bind to the user's configured port numbers/ranges
+
+    Random code shouldn't be listening on sockets elsewhere.
+
+    Today its the wild west, but we only need to grant access to what the user configured.
+
+    This means e.g. multicast plugin has to declare its intentions in its security.policy
+
+    Closes #14549
+
+commit 3d8b4dae33329cabfe79b0e9f72d89e978015b37
+Author: Robert Muir <rmuir@apache.org>
+Date:   Wed Nov 4 00:31:15 2015 -0500
+
+    remove the ability for code to change file permissions, this was
+    only needed for pluginmanager's test, and pluginmanager doesn't
+    even run with securitymanager yet.
+
+commit 5832ea1b5f5fa0b90117ce9bc2cb0c54002c3f79
+Author: Ryan Ernst <ryan@iernst.net>
+Date:   Wed Oct 28 15:00:49 2015 -0700
+
+    fix plugins to support security policy files in gradle
+
+commit d422d467671deb161299ed792811f2aa041d0ab0
+Author: Robert Muir <rmuir@apache.org>
+Date:   Tue Oct 27 20:06:13 2015 -0400
+
+    Cleanup plugin security
+
+    * plugin authors can use full policy syntax, including codebase substitution
+      properties like core syntax.
+    * simplify test logic.
+    * move out test-framework permissions to separate file.
+
+    Closes #14311
+
+    Conflicts:
+        core/src/main/java/org/elasticsearch/bootstrap/Security.java
+        core/src/main/resources/org/elasticsearch/bootstrap/security.policy
+        core/src/test/java/org/elasticsearch/bootstrap/BootstrapForTesting.java
+        core/src/test/java/org/elasticsearch/bootstrap/MockPluginPolicy.java
+
+commit eec3c2a97c9c1d1110dab50641d38b043058e0da
+Author: Robert Muir <rmuir@apache.org>
+Date:   Tue Oct 27 20:06:13 2015 -0400
+
+    Cleanup plugin security
+
+    * plugin authors can use full policy syntax, including codebase substitution
+      properties like core syntax.
+    * simplify test logic.
+    * move out test-framework permissions to separate file.
+
+    Closes #14311
+
+commit f7fe2c2007b6ac8e93618cbd2657decb41d0c892
+Author: Simon Willnauer <simonw@apache.org>
+Date:   Tue Oct 27 12:52:52 2015 +0100
+
+    Open up QueryCache and SearcherWrapper extension points
+
+    This commit makes QueryCache and SearcherWrappoer registration public
+    otherwise plugins can't access those extension points due to security restrictions.
+
+commit 6074f631d07d5aa2b48a3887d2d641b1edc41085
+Author: Nik Everett <nik9000@gmail.com>
+Date:   Tue Oct 20 14:55:34 2015 -0400
+
+    [test] Convert GCE test to ESTestCase
+
+    And work around GCE's annoying security issues that that exposed.
+
+    Required for #14069
+
+commit 955e6e33c3990c5caf288bfdbdc038d0cb256a1a
+Author: Robert Muir <rmuir@apache.org>
+Date:   Thu Oct 15 01:40:32 2015 -0400
+
+    Fix SeccompTests bug on older kernels
+
+    This test failed only on a feature branch, because that feature branch has
+    a different build randomization script and is the only place
+    randomizing tests.security.manager (this test cannot run with it enabled).
+
+    On old kernels without TSYNC support, the test fails because (surprise to me) the thread that
+    runs the test is not the same thread that runs static initializers:
+    https://github.com/randomizedtesting/randomizedtesting/blob/7571489190d677969c768836e1576f4e851f83e8/randomized-runner/src/main/java/com/carrotsearch/randomizedtesting/RandomizedRunner.java#L573-L574
+
+    To fix this test (its not an issue in practice, since we do this before creating threadpools),
+    we just record for testing purposes that we couldn't TSYNC, and re-run the whole thing for the test thread
+    in setUp(), failing if something goes wrong.
+
+    Also add a bunch of additional paranoia and narrow our defensive checks better here after reading
+    through more chrome bug reports: they don't impact us but those linux distros are too cowboy
+    with the backports and the spirit of the checks makes me feel better.
+
+commit 6a8c4a0bb752dfac460d779270bc9045da3fde36
+Author: Robert Muir <rmuir@apache.org>
+Date:   Thu Oct 15 01:40:32 2015 -0400
+
+    Fix SeccompTests bug on older kernels
+
+    This test failed only on a feature branch, because that feature branch has
+    a different build randomization script and is the only place
+    randomizing tests.security.manager (this test cannot run with it enabled).
+
+    On old kernels without TSYNC support, the test fails because (surprise to me) the thread that
+    runs the test is not the same thread that runs static initializers:
+    https://github.com/randomizedtesting/randomizedtesting/blob/7571489190d677969c768836e1576f4e851f83e8/randomized-runner/src/main/java/com/carrotsearch/randomizedtesting/RandomizedRunner.java#L573-L574
+
+    To fix this test (its not an issue in practice, since we do this before creating threadpools),
+    we just record for testing purposes that we couldn't TSYNC, and re-run the whole thing for the test thread
+    in setUp(), failing if something goes wrong.
+
+    Also add a bunch of additional paranoia and narrow our defensive checks better here after reading
+    through more chrome bug reports: they don't impact us but those linux distros are too cowboy
+    with the backports and the spirit of the checks makes me feel better.
+
+commit 7650390fa2486db9bdf352a57cdfebf8e8c4bd6d
+Author: Robert Muir <rmuir@apache.org>
+Date:   Thu Oct 15 02:17:53 2015 -0400
+
+    Decentralize plugin security
+
+    * Add ability for plugins to declare additional permissions with a custom plugin-security.policy file and corresponding AccessController logic. See the plugin author's guide for more information.
+    * Add warning messages to users for extra plugin permissions in bin/plugin.
+    * When bin/plugin is run interactively (stdin is a controlling terminal and -b/--batch not supplied), require user confirmation.
+    * Improve unit test and IDE support for plugins with additional permissions by exposing plugin's metadata as a maven test resource.
+
+    Closes #14108
+
+    Squashed commit of the following:
+
+    commit cc3f7ecc246c64a059426c98271ccdea25ebf2d0
+    Author: Robert Muir <rmuir@apache.org>
+    Date:   Thu Oct 15 02:15:49 2015 -0400
+
+        java 7 fixes
+
+    commit 626cf16e228eee65218b827599f966867f36ea48
+    Author: Robert Muir <rmuir@apache.org>
+    Date:   Thu Oct 15 02:09:19 2015 -0400
+
+        Don't merge file back to discovery-ec2
+
+    commit a64471d3cf584223686b237448e570c9dae60754
+    Author: Robert Muir <rmuir@apache.org>
+    Date:   Wed Oct 14 14:46:45 2015 -0400
+
+        Decentralize plugin security
+
+        * Add ability for plugins to declare additional permissions with a custom plugin-security.policy file and corresponding AccessController logic. See the plugin author's guide for more information.
+        * Add warning messages to users for extra plugin permissions in bin/plugin.
+        * When bin/plugin is run interactively (stdin is a controlling terminal and -b/--batch not supplied), require user confirmation.
+        * Improve unit test and IDE support for plugins with additional permissions by exposing plugin's metadata as a maven test resource.
+
+        Closes #14108
+
+        Squashed commit of the following:
+
+        commit cf8ace65a7397aaccd356bf55f95d6fbb8bb571c
+        Author: Robert Muir <rmuir@apache.org>
+        Date:   Wed Oct 14 13:36:05 2015 -0400
+
+            fix new unit test from master merge
+
+        commit 9be3c5aa38f2d9ae50f3d54924a30ad9cddeeb65
+        Merge: 2f168b8 7368231
+        Author: Robert Muir <rmuir@apache.org>
+        Date:   Wed Oct 14 12:58:31 2015 -0400
+
+            Merge branch 'master' into off_my_back
+
+        commit 2f168b8038e32672f01ad0279fb5db77ba902ae8
+        Author: Robert Muir <rmuir@apache.org>
+        Date:   Wed Oct 14 12:56:04 2015 -0400
+
+            improve plugin author documentation
+
+        commit 6e6c2bfda68a418d92733ac22a58eec35508b2d0
+        Author: Robert Muir <rmuir@apache.org>
+        Date:   Wed Oct 14 12:52:14 2015 -0400
+
+            move security confirmation after 'plugin already installed' check, to prevent user from answering unnecessary questions.
+
+        commit 08233a2972554afef2a6a7521990283102e20d92
+        Author: Robert Muir <rmuir@apache.org>
+        Date:   Wed Oct 14 05:36:42 2015 -0400
+
+            Add documentation and pluginmanager support
+
+        commit 05dad86c51488ba43ccbd749f0164f3fbd3aee62
+        Author: Robert Muir <rmuir@apache.org>
+        Date:   Wed Oct 14 02:22:24 2015 -0400
+
+            Decentralize plugin permissions (modulo docs and pluginmanager work)
+
+        Conflicts:
+                core/src/main/java/org/elasticsearch/bootstrap/Security.java
+                core/src/main/resources/org/elasticsearch/bootstrap/security.policy
+
+commit 9c109cae0dcc655f969e7f1554981a743e50e394
+Author: Robert Muir <rmuir@apache.org>
+Date:   Thu Oct 15 01:40:32 2015 -0400
+
+    Fix SeccompTests bug on older kernels
+
+    This test failed only on a feature branch, because that feature branch has
+    a different build randomization script and is the only place
+    randomizing tests.security.manager (this test cannot run with it enabled).
+
+    On old kernels without TSYNC support, the test fails because (surprise to me) the thread that
+    runs the test is not the same thread that runs static initializers:
+    https://github.com/randomizedtesting/randomizedtesting/blob/7571489190d677969c768836e1576f4e851f83e8/randomized-runner/src/main/java/com/carrotsearch/randomizedtesting/RandomizedRunner.java#L573-L574
+
+    To fix this test (its not an issue in practice, since we do this before creating threadpools),
+    we just record for testing purposes that we couldn't TSYNC, and re-run the whole thing for the test thread
+    in setUp(), failing if something goes wrong.
+
+    Also add a bunch of additional paranoia and narrow our defensive checks better here after reading
+    through more chrome bug reports: they don't impact us but those linux distros are too cowboy
+    with the backports and the spirit of the checks makes me feel better.
+
+commit 5d001d15781fc56b3bf6e7e54f2d0d736cd602e4
+Author: Robert Muir <rmuir@apache.org>
+Date:   Wed Oct 14 14:46:45 2015 -0400
+
+    Decentralize plugin security
+
+    * Add ability for plugins to declare additional permissions with a custom plugin-security.policy file and corresponding AccessController logic. See the plugin author's guide for more information.
+    * Add warning messages to users for extra plugin permissions in bin/plugin.
+    * When bin/plugin is run interactively (stdin is a controlling terminal and -b/--batch not supplied), require user confirmation.
+    * Improve unit test and IDE support for plugins with additional permissions by exposing plugin's metadata as a maven test resource.
+
+    Closes #14108
+
+    Squashed commit of the following:
+
+    commit cf8ace65a7397aaccd356bf55f95d6fbb8bb571c
+    Author: Robert Muir <rmuir@apache.org>
+    Date:   Wed Oct 14 13:36:05 2015 -0400
+
+        fix new unit test from master merge
+
+    commit 9be3c5aa38f2d9ae50f3d54924a30ad9cddeeb65
+    Merge: 2f168b8 7368231
+    Author: Robert Muir <rmuir@apache.org>
+    Date:   Wed Oct 14 12:58:31 2015 -0400
+
+        Merge branch 'master' into off_my_back
+
+    commit 2f168b8038e32672f01ad0279fb5db77ba902ae8
+    Author: Robert Muir <rmuir@apache.org>
+    Date:   Wed Oct 14 12:56:04 2015 -0400
+
+        improve plugin author documentation
+
+    commit 6e6c2bfda68a418d92733ac22a58eec35508b2d0
+    Author: Robert Muir <rmuir@apache.org>
+    Date:   Wed Oct 14 12:52:14 2015 -0400
+
+        move security confirmation after 'plugin already installed' check, to prevent user from answering unnecessary questions.
+
+    commit 08233a2972554afef2a6a7521990283102e20d92
+    Author: Robert Muir <rmuir@apache.org>
+    Date:   Wed Oct 14 05:36:42 2015 -0400
+
+        Add documentation and pluginmanager support
+
+    commit 05dad86c51488ba43ccbd749f0164f3fbd3aee62
+    Author: Robert Muir <rmuir@apache.org>
+    Date:   Wed Oct 14 02:22:24 2015 -0400
+
+        Decentralize plugin permissions (modulo docs and pluginmanager work)
+
+commit 31c22ccbd0f1a3937de250da4b47c26ac35f6d53
+Author: Ryan Ernst <ryan@iernst.net>
+Date:   Wed Oct 7 16:44:13 2015 -0700
+
+    fix scripting tests, so they get passed the artifact and can setup
+    security manager with their special permissions for unit tests
+
+commit 4ddc4633d1a5967ce61e8e8f91749f48f1dd4f85
+Author: Robert Muir <rmuir@apache.org>
+Date:   Tue Sep 29 17:32:56 2015 -0400
+
+    Add SpecialPermission to guard exceptions to security policy.
+
+    Closes #13854
+
+    Squashed commit of the following:
+
+    commit 42c1166efc55adda0d13fed77de583c0973e44b3
+    Author: Robert Muir <rmuir@apache.org>
+    Date:   Tue Sep 29 11:59:43 2015 -0400
+
+        Add paranoia
+
+        Groovy holds on to a classloader, so check it before compilation too.
+        I have not reviewed yet what Rhino is doing, but just be safe.
+
+    commit b58668a81428e964dd5ffa712872c0a34897fc91
+    Author: Robert Muir <rmuir@apache.org>
+    Date:   Tue Sep 29 11:46:06 2015 -0400
+
+        Add SpecialPermission to guard exceptions to security policy.
+
+        In some cases (e.g. buggy cloud libraries, scripting engines), we must
+        grant dangerous permissions to contained cases. Those AccessController blocks
+        are dangerous, since they truncate the stack, and can allow privilege escalation.
+
+        This PR adds a simple permission to check before each one, so that unprivileged code
+        like groovy scripts, can't do anything they shouldn't be allowed to do otherwise.
+
+    Conflicts:
+        plugins/cloud-gce/src/main/java/org/elasticsearch/cloud/gce/GceComputeServiceImpl.java
+        plugins/lang-groovy/src/main/java/org/elasticsearch/script/groovy/GroovyScriptEngineService.java
+        plugins/repository-s3/src/main/java/org/elasticsearch/plugin/repository/s3/S3RepositoryPlugin.java
+
+commit 41e089aa2a517ea4764d2701398a01aa986ada53
+Author: Robert Muir <rmuir@apache.org>
+Date:   Thu Sep 17 23:51:51 2015 -0400
+
+    Add Intellij support for plugins with extra permissions.
+
+    graduate this from a hack for insecure plugins to something we can
+    live with for per-module/plugin permissions, it now works reasonably
+    in unit tests and with Intellij and Eclipse IDEs.
+
+    remove security warnings: we will deal with these issues in a secure
+    way, if we cannot, then the plugin shouldn't be in our core codebase.
+
+    Conflicts:
+        core/src/main/java/org/elasticsearch/bootstrap/Security.java
+        core/src/main/resources/org/elasticsearch/bootstrap/security.policy
+
+commit 85f3d864b45edcbe4e774924c019f379a65a7aa7
+Author: Robert Muir <rmuir@apache.org>
+Date:   Wed Sep 16 03:11:01 2015 -0400
+
+    Add a mechanism for insecure plugins and get all tests passing
+
+    Conflicts:
+        core/src/main/java/org/elasticsearch/bootstrap/BootstrapInfo.java
+        core/src/main/resources/org/elasticsearch/bootstrap/security.policy
+        plugins/cloud-aws/src/main/java/org/elasticsearch/plugin/cloud/aws/CloudAwsPlugin.java
+        plugins/cloud-gce/src/main/java/org/elasticsearch/cloud/gce/GceComputeServiceImpl.java
+        plugins/repository-s3/src/main/java/org/elasticsearch/plugin/repository/s3/S3RepositoryPlugin.java
+
+commit 87371dbe818f23fd550d9a8ea988ba35435a67fa
+Author: Robert Muir <rmuir@apache.org>
+Date:   Sat Sep 12 14:16:16 2015 -0400
+
+    Hack around aws security hole of accessing sun.security.ssl, s3 repository works on java 9 again
+
+    Today this is really horrible, and we have a PR sent to fix it, but nobody
+    does anything: https://github.com/aws/aws-sdk-java/pull/432
+
+    With java 9, we cannot even grant the permission, this kind of sheistiness is not allowed,
+    and s3 repository is completely broken.
+
+    The problem is their code is still broken, and won't handle neither SecurityException (our PR)
+    nor the new InaccessibleObjectException they will get from java 9.
+
+    We use a really hacky hack to deliver an exception that their code catches (IllegalAccessException) instead.
+
+    This means s3 repository is working on java 9, and we close off access to sun.security.ssl completely
+
+commit e34f4f03b8e9b3f48e0deed825e794b55ceeb87c
+Author: Robert Muir <rmuir@apache.org>
+Date:   Sat Sep 12 02:11:06 2015 -0400
+
+    ban setAccessible from core code.
+
+    In addition to being a big security problem, setAccessible is a risk
+    for java 9 migration. We need to clean up our code so we can ban it
+    and eventually enforce this with security manager for third-party code, too,
+    or we may have problems.
+
+    Instead of using setAccessible, use the correct modifier (e.g. public).
+
+    TODO: ban in tests
+    TODO: ban in security manager at runtime
+
+    Conflicts:
+        core/src/main/java/org/elasticsearch/search/action/SearchServiceTransportAction.java
+        dev-tools/src/main/resources/forbidden/core-signatures.txt
+
+commit 207740c706cde619b1b7a8b657cf1c358a80deb4
+Author: Robert Muir <rmuir@apache.org>
+Date:   Wed Sep 9 16:35:21 2015 -0400
+
+    Upgrade lucene to r1702090
+
+    The semantics of the `boost` parameter for `function_score` changed. This is
+    due to the fact that Lucene now requires that query boosts and top-level boosts
+    are applied the same way.
+
+    Conflicts:
+        core/src/main/java/org/elasticsearch/bootstrap/Security.java
+        core/src/main/resources/org/elasticsearch/bootstrap/security.policy
+
+commit 8c2c51c96097fee397d9c9442f831862c2d1fc25
+Author: Ryan Ernst <ryan@iernst.net>
+Date:   Wed Sep 9 16:07:28 2015 -0700
+
+    add temp test security manager to test jar
+
+commit e9582d7ab598ccddbe339cfd34fdd237fd786192
+Author: Robert Muir <rmuir@apache.org>
+Date:   Tue Sep 8 15:55:33 2015 -0400
+
+    Enable security manager by default in tests (e.g. IDEs)
+
+    Otherwise people will be confused when they use maven.
+
+commit 6d8c035f70cd20d3c07dfb624910d6479dfd80b5
+Author: Robert Muir <rmuir@apache.org>
+Date:   Tue Sep 29 17:32:56 2015 -0400
+
+    Add SpecialPermission to guard exceptions to security policy.
+
+    Closes #13854
+
+    Squashed commit of the following:
+
+    commit 42c1166efc55adda0d13fed77de583c0973e44b3
+    Author: Robert Muir <rmuir@apache.org>
+    Date:   Tue Sep 29 11:59:43 2015 -0400
+
+        Add paranoia
+:

@@ -1,0 +1,11 @@
+jagsi@jagsi-PC MINGW64 ~/Documents/Virginia Tech/Software Engineering/Project/picasso (master)
+$ git log --all --grep="security";
+commit 773b1d6046ae6155624ef664345b0b0c577895f9
+Merge: e3d2852 edee8c8
+Author: Jake Wharton <jakewharton@gmail.com>
+Date:   Tue Dec 8 12:15:58 2015 -0500
+
+    Merge pull request #1227 from digitalbuddha/bug/security_exception
+
+    add try for SecurityException in isAirplaneModeOn
+

@@ -1,0 +1,8 @@
+commit 78f57fb2203b9547034cde6f7d0bd5bd67a19d5c
+Merge: 0ed1989 85257fd
+Author: Pablo Fernandez <fernandezpablo85@gmail.com>
+Date:   Mon Nov 26 15:35:23 2012 -0800
+
+    Merge pull request #330 from sovnarkom/master
+
+    Important fix to fix security alert and https sertificate exception
