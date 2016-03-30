@@ -23,19 +23,26 @@ public class CodeCommit {
 	/**
 	 * Constructor used to create a commit
 	 * 
-	 * @param commit Git commit ID
-	 * @param author The person who submitted the changes
-	 * @param message Git commit message
-	 * @param date Date changes were commited
-	 * @param reviewUrl URL to to the commit review
-	 * @param Git_svn_id Git SVN ID
-	 * @param bug Related bug information
-	 * @param test Related test information
+	 * @param commit
+	 *            Git commit ID
+	 * @param author
+	 *            The person who submitted the changes
+	 * @param message
+	 *            Git commit message
+	 * @param date
+	 *            Date changes were commited
+	 * @param reviewUrl
+	 *            URL to to the commit review
+	 * @param Git_svn_id
+	 *            Git SVN ID
+	 * @param bug
+	 *            Related bug information
+	 * @param test
+	 *            Related test information
 	 */
-	public CodeCommit(String commit, String author, 
-			String message, String date, String reviewUrl, String git_svn_id, 
-			String bug, String test){
-	
+	public CodeCommit(String commit, String author, String message, String date, String reviewUrl, String git_svn_id,
+			String bug, String test) {
+
 		this.commit = commit;
 		this.author = author;
 		this.message = message;
@@ -45,70 +52,78 @@ public class CodeCommit {
 		this.bug = bug;
 		this.test = test;
 	}
+
 	/**
 	 * 
 	 * @return Returns the commit ID string
 	 */
-	public String getCommit(){
+	public String getCommit() {
 		return commit;
 	}
+
 	/**
 	 * 
 	 * @return Returns the commit author information string
 	 */
-	public String getAuthor(){
+	public String getAuthor() {
 		return author;
 	}
+
 	/**
 	 * 
 	 * @return Returns the commit message string
 	 */
-	public String getMessage(){
+	public String getMessage() {
 		return message;
 	}
+
 	/**
 	 * 
 	 * @return Returns the commit date string
 	 */
-	public String getDate(){
+	public String getDate() {
 		return date;
 	}
+
 	/**
 	 * 
 	 * @return Returns the commit URL for the related change review string
 	 */
-	public String getReviewUrl(){
+	public String getReviewUrl() {
 		return reviewUrl;
 	}
+
 	/**
 	 * 
 	 * @return Returns the commit GIT SVN ID string
 	 */
-	public String getGitSvnId(){
+	public String getGitSvnId() {
 		return git_svn_id;
 	}
+
 	/**
 	 * 
 	 * @return Returns the commit bug string
 	 */
-	public String getBug(){
+	public String getBug() {
 		return bug;
 	}
+
 	/**
 	 * 
 	 * @return Returns the commit test string
 	 */
-	public String getTest(){
+	public String getTest() {
 		return test;
 	}
-	
+
 	/**
 	 * @override Overrides the toTring method
 	 */
-	public String toString(){
-		return "\nAuthor: "+author+"\t\nCommit Date: "+
-				date+"\t\nCommit Message: "+message+"\t\nReview URL: "+
-				reviewUrl+"\t\nGIT SVN ID: "+git_svn_id+"\t\n";
+	public String toString() {
+		return "\nCommit: " + commit + "\t\nAuthor: " + author + "\t\nCommit Date: " + date + "\t\nCommit Message: "
+				+ message + "\t\nBug: " + bug + "\t\nTest: " + test + "\t\nReview URL: " + reviewUrl
+				+ "\t\nGIT SVN ID: " + git_svn_id + "\t\n";
 	}
-	
+
 }

@@ -44,63 +44,37 @@ public class CommitAnalyzer {
 		String git_svn_id = "";
 		String bug = "";
 		String test = "";
+		String value = "";
+		Boolean readNext = true;
+		Boolean firstCommit = true;
 		
 		CommitAnalyzer myCommitAnalyzer = new CommitAnalyzer();
 		
 		try{
-			BufferedReader file = new BufferedReader(new FileReader("C:/Users/Moeti/workspace/CommitAnalyzer/src/software_eng/commits-hive.txt"));
+			BufferedReader file = new BufferedReader(new FileReader("C:/Users/Moeti/workspace/CommitAnalyzer/src/software_eng/commits-chromium.txt"));
 			line = file.readLine();
 			while(line!=null){
-			if (line.trim().split(" ", 2)[0].equalsIgnoreCase("COMMIT")){
-				if (line!=null){
+				if (!line.trim().isEmpty()){
+					System.out.println("Line is: "+line);
+					if ( line.trim().split(" ", 2)[0].length()>2){
+						value = line.trim().split(" ", 2)[0].substring(0, 3);
+					}
+					else{
+						value = "mes";
+					}
+				}
+				else {
+					value = "";
+				}
 					
-						commit = commit + " " + line.trim().substring(7).trim();
-						line=file.readLine();
+				System.out.println("Value is: "+value);
+				if (line.isEmpty()){
+					System.out.println("Empty line");
 				}
-			}
-			if (line.trim().split(" ", 2)[0].equalsIgnoreCase("AUTHOR:")){
-				if (line!=null){
-					commit = commit + ";";
-						author = author + " " + line.trim().substring(8).trim();
-						line=file.readLine();
-				}
-			}
-			if (line.trim().split(" ", 2)[0].equalsIgnoreCase("DATE:")){
-				if (line!=null){
-					author = author + ";";
-						date = date + " " + line.trim().substring(5).trim();
-						line=file.readLine();
-				}
-			}
-			if (line.trim().split("=", 2)[0].equalsIgnoreCase("bug")){
-				if (line!=null){ 
-					date = date + ";";
-					message = message.trim() + ";";
-					bug = bug + " " + line.trim().substring(4).trim();
-					line=file.readLine();					
-				}
-			}
-			if (line.trim().split("=", 2)[0].equalsIgnoreCase("test")){
-				if (line!=null){ 
-					test = test + " " + line.trim().substring(5).trim();
-					line=file.readLine();					
-				}
-			}
-			if (line.trim().split(" ", 2)[0].equalsIgnoreCase("Review")){
-				if (line!=null){ 
-						bug = bug + ";";
-						test = test + ";";
-						reviewUrl = reviewUrl + " " + line.trim().substring(11).trim();
-						line=file.readLine();
-				}
-			}
-			if (line.trim().split(" ", 2)[0].equalsIgnoreCase("git-svn-id:")){
-				if (line!=null){ 
-					reviewUrl = reviewUrl + ";";
-					git_svn_id = git_svn_id + " " + line.trim().substring(11).trim();
-					git_svn_id = git_svn_id + ";";
-					line=file.readLine();	
-					//Copy local variable data to fields
+				else if (value.equalsIgnoreCase("COM")){System.out.println("halla: "+commit);
+				if (!firstCommit){
+					//commit = commit + "\t";
+					System.out.println("Creating commit object");
 					myCommitAnalyzer.setFields(commit, author, 
 							message, date, reviewUrl, git_svn_id, 
 							bug, test);
@@ -109,8 +83,8 @@ public class CommitAnalyzer {
 					//reset field data
 					myCommitAnalyzer.clearFields();
 					//clear local variables
+					commit = line.trim().substring(8).trim();
 					line = "";
-					commit = "";
 					author = "";
 					message = "";
 					date = "";
@@ -118,15 +92,81 @@ public class CommitAnalyzer {
 					git_svn_id = "";
 					bug = "";
 					test = "";
+					readNext = false;
+					
+					
+				}
+				else{
+					commit = line.trim().substring(8).trim();
+					firstCommit = false;
+				}
+				
+				
+			}
+			else if (value.equalsIgnoreCase("AUT")){
+				if (line!=null){
+					
+						author = line.trim().substring(8).trim();
 				}
 			}
-			else{
-				message = message.trim() + " " + line.trim();
+			else if (value.equalsIgnoreCase("DAT")){
+				if (line!=null){
+						date = line.trim().substring(5).trim();
+				}
+			}
+			else if (value.isEmpty()){
+				
+			}
+			else if (value.equalsIgnoreCase("bug")){
+				System.out.println("Bug first word: "+line.trim().split(" ", 2)[0]);
+			
+				if (line!=null){ 
+					message = message.trim() + "\t";
+					bug = line.trim().substring(4).trim();		
+				}
+			}
+			else if (value.equalsIgnoreCase("tes")){
+				if (line!=null){ 
+					test = line.trim().substring(5).trim();			
+				}
+			}
+			else if (value.equalsIgnoreCase("Rev")){
+				
+				if (line!=null){ 
+					System.out.println("Hi");
+						reviewUrl = line.trim().substring(11).trim();
+				}
+			}
+			
+			else if (value.equalsIgnoreCase("git")){
+				
+				if (line!=null){ 
+					git_svn_id = line.trim().substring(11).trim();
+					
+				}
+			}
+			else {
+				
+						message = message.trim() + " " + line.trim();
+					
+			
+			}
+				if (readNext){
 				line = file.readLine();
+				}
+				else{
+					readNext=true;
+				}
 			}
 			
-			}
-			
+			//add the final commit to the the array list
+			myCommitAnalyzer.setFields(commit, author, 
+					message, date, reviewUrl, git_svn_id, 
+					bug, test);
+			//Create a commit object
+			myCommitAnalyzer.loadData();
+			//reset field data
+			myCommitAnalyzer.clearFields();
 			
 			file.close();
 			myCommitAnalyzer.getCommits();
@@ -204,13 +244,13 @@ public class CommitAnalyzer {
 			
 		BufferedWriter out = new BufferedWriter(new FileWriter
 				(file.getAbsoluteFile()));
-		out.write("Commit; Author; Date; Message; Bug; Test; Review URL; Git SVN ID");
+		out.write("Commit\t Author\t Date\t Message\t Bug\t Test\t Review URL\t Git SVN ID");
 		out.newLine();
 		for (int i=0; i<this.commits.size(); i++){
-			out.write(this.commits.get(i).getCommit().trim()+" "+this.commits.get(i).getAuthor().trim()
-					+" "+this.commits.get(i).getDate().trim()+" "+this.commits.get(i).getMessage().trim()
-					+" "+this.commits.get(i).getBug().trim()+" "+this.commits.get(i).getTest().trim()
-					+" "+this.commits.get(i).getReviewUrl().trim()+" "+this.commits.get(i).getGitSvnId().trim());
+			out.write(this.commits.get(i).getCommit().trim()+"\t"+this.commits.get(i).getAuthor().trim()
+					+"\t"+this.commits.get(i).getDate().trim()+"\t"+this.commits.get(i).getMessage().trim()
+					+"\t"+this.commits.get(i).getBug().trim()+"\t"+this.commits.get(i).getTest().trim()
+					+"\t"+this.commits.get(i).getReviewUrl().trim()+"\t"+this.commits.get(i).getGitSvnId().trim());
 			out.newLine();
 			//out.write("Hi");
 			}
