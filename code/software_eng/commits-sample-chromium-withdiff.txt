@@ -1,0 +1,1665 @@
+commit 0906cac26ecd6cfd5c98ee5ab296c64e34c78eab
+Author: sergeyu@chromium.org <sergeyu@chromium.org@0039d316-1c4b-4281-b951-d872f2087c98>
+Date:   Wed Mar 6 00:36:10 2013 +0000
+
+    Pass ID of the calling extension to the native messaging host.
+    
+    Previously native hosts didn't have a way to know which extension started
+    them. With this change security origin of the calling extension will be
+    passed to the native host process as a parameter, so that it knows which
+    extension is calling it.
+    
+    BUG=142915
+    
+    Review URL: https://codereview.chromium.org/12406002
+    
+    git-svn-id: svn://svn.chromium.org/chrome/trunk/src@186297 0039d316-1c4b-4281-b951-d872f2087c98
+
+diff --git a/chrome/browser/extensions/api/messaging/native_message_process_host_unittest.cc b/chrome/browser/extensions/api/messaging/native_message_process_host_unittest.cc
+index cc8192b..d95ba5d 100644
+--- a/chrome/browser/extensions/api/messaging/native_message_process_host_unittest.cc
++++ b/chrome/browser/extensions/api/messaging/native_message_process_host_unittest.cc
+@@ -7,6 +7,7 @@
+ #include "base/file_util.h"
+ #include "base/files/file_path.h"
+ #include "base/files/scoped_temp_dir.h"
++#include "base/json/json_reader.h"
+ #include "base/memory/scoped_ptr.h"
+ #include "base/memory/weak_ptr.h"
+ #include "base/message_loop.h"
+@@ -110,7 +111,19 @@ class NativeMessagingTest : public ::testing::Test,
+   virtual void PostMessageFromNativeProcess(
+       int port_id,
+       const std::string& message) OVERRIDE  {
+-    last_posted_message_ = message;
++    last_message_ = message;
++
++    // Parse the message.
++    base::Value* parsed = base::JSONReader::Read(message);
++    base::DictionaryValue* dict_value;
++    if (parsed && parsed->GetAsDictionary(&dict_value)) {
++      last_message_parsed_.reset(dict_value);
++    } else {
++      LOG(ERROR) << "Failed to parse " << message;
++      last_message_parsed_.reset();
++      delete parsed;
++    }
++
+     if (read_message_run_loop_)
+       read_message_run_loop_->Quit();
+   }
+@@ -144,7 +157,8 @@ class NativeMessagingTest : public ::testing::Test,
+   scoped_ptr<base::RunLoop> read_message_run_loop_;
+   scoped_ptr<content::TestBrowserThread> ui_thread_;
+   scoped_ptr<content::TestBrowserThread> io_thread_;
+-  std::string last_posted_message_;
++  std::string last_message_;
++  scoped_ptr<base::DictionaryValue> last_message_parsed_;
+ };
+ 
+ // Read a single message from a local file.
+@@ -161,12 +175,12 @@ TEST_F(NativeMessagingTest, SingleSendMessageRead) {
+   read_message_run_loop_.reset(new base::RunLoop());
+   read_message_run_loop_->RunUntilIdle();
+ 
+-  if (last_posted_message_.empty()) {
++  if (last_message_.empty()) {
+     read_message_run_loop_.reset(new base::RunLoop());
+     native_message_process_host_->ReadNowForTesting();
+     read_message_run_loop_->Run();
+   }
+-  EXPECT_EQ(kTestMessage, last_posted_message_);
++  EXPECT_EQ(kTestMessage, last_message_);
+ }
+ 
+ // Tests sending a single message. The message should get written to
+@@ -199,7 +213,7 @@ TEST_F(NativeMessagingTest, SingleSendMessageWrite) {
+ }
+ 
+ // Test send message with a real client. The client just echo's back the text
+-// it recieved.
++// it received.
+ TEST_F(NativeMessagingTest, EchoConnect) {
+   base::ScopedTempDir temp_dir;
+   base::FilePath manifest_path = temp_dir.path().AppendASCII(
+@@ -220,13 +234,31 @@ TEST_F(NativeMessagingTest, EchoConnect) {
+   native_message_process_host_->Send("{\"text\": \"Hello.\"}");
+   read_message_run_loop_.reset(new base::RunLoop());
+   read_message_run_loop_->Run();
+-  EXPECT_EQ("{\"id\": 1, \"echo\": {\"text\": \"Hello.\"}}",
+-            last_posted_message_);
++  ASSERT_FALSE(last_message_.empty());
++  ASSERT_TRUE(last_message_parsed_);
++
++  std::string expected_url = std::string("chrome-extension://") +
++      kTestNativeMessagingExtensionId + "/";
++  int id;
++  EXPECT_TRUE(last_message_parsed_->GetInteger("id", &id));
++  EXPECT_EQ(1, id);
++  std::string text;
++  EXPECT_TRUE(last_message_parsed_->GetString("echo.text", &text));
++  EXPECT_EQ("Hello.", text);
++  std::string url;
++  EXPECT_TRUE(last_message_parsed_->GetString("caller_url", &url));
++  EXPECT_EQ(expected_url, url);
++
+ 
+   native_message_process_host_->Send("{\"foo\": \"bar\"}");
+   read_message_run_loop_.reset(new base::RunLoop());
+   read_message_run_loop_->Run();
+-  EXPECT_EQ("{\"id\": 2, \"echo\": {\"foo\": \"bar\"}}", last_posted_message_);
++  EXPECT_TRUE(last_message_parsed_->GetInteger("id", &id));
++  EXPECT_EQ(2, id);
++  EXPECT_TRUE(last_message_parsed_->GetString("echo.foo", &text));
++  EXPECT_EQ("bar", text);
++  EXPECT_TRUE(last_message_parsed_->GetString("caller_url", &url));
++  EXPECT_EQ(expected_url, url);
+ }
+ 
+ }  // namespace extensions
+diff --git a/chrome/browser/extensions/api/messaging/native_process_launcher.cc b/chrome/browser/extensions/api/messaging/native_process_launcher.cc
+index ee53ec7c..2fe6601 100644
+--- a/chrome/browser/extensions/api/messaging/native_process_launcher.cc
++++ b/chrome/browser/extensions/api/messaging/native_process_launcher.cc
+@@ -160,10 +160,13 @@ void NativeProcessLauncherImpl::Core::DoLaunchOnThreadPool(
+     return;
+   }
+ 
++  CommandLine command_line(manifest->path());
++  command_line.AppendArg(origin.spec());
++
+   base::PlatformFile read_file;
+   base::PlatformFile write_file;
+   bool result = NativeProcessLauncher::LaunchNativeProcess(
+-      manifest->path(), &read_file, &write_file);
++      command_line, &read_file, &write_file);
+ 
+   content::BrowserThread::PostTask(
+       content::BrowserThread::IO, FROM_HERE,
+diff --git a/chrome/browser/extensions/api/messaging/native_process_launcher.h b/chrome/browser/extensions/api/messaging/native_process_launcher.h
+index f1b6483..b773e3e 100644
+--- a/chrome/browser/extensions/api/messaging/native_process_launcher.h
++++ b/chrome/browser/extensions/api/messaging/native_process_launcher.h
+@@ -8,6 +8,7 @@
+ #include "base/process.h"
+ #include "chrome/browser/extensions/api/messaging/native_message_process_host.h"
+ 
++class CommandLine;
+ class GURL;
+ 
+ namespace base {
+@@ -53,7 +54,7 @@ class NativeProcessLauncher {
+ 
+   // Launches native messaging process.
+   static bool LaunchNativeProcess(
+-      const base::FilePath& path,
++      const CommandLine& command_line,
+       base::PlatformFile* read_file,
+       base::PlatformFile* write_file);
+ 
+diff --git a/chrome/browser/extensions/api/messaging/native_process_launcher_posix.cc b/chrome/browser/extensions/api/messaging/native_process_launcher_posix.cc
+index cd2d058..8cb3e46 100644
+--- a/chrome/browser/extensions/api/messaging/native_process_launcher_posix.cc
++++ b/chrome/browser/extensions/api/messaging/native_process_launcher_posix.cc
+@@ -37,7 +37,7 @@ NativeProcessLauncher::FindAndLoadManifest(
+ 
+ // static
+ bool NativeProcessLauncher::LaunchNativeProcess(
+-    const base::FilePath& path,
++    const CommandLine& command_line,
+     base::PlatformFile* read_file,
+     base::PlatformFile* write_file) {
+   base::FileHandleMappingVector fd_map;
+@@ -60,11 +60,10 @@ bool NativeProcessLauncher::LaunchNativeProcess(
+   file_util::ScopedFD write_pipe_write_fd(&write_pipe_fds[1]);
+   fd_map.push_back(std::make_pair(*write_pipe_read_fd, STDIN_FILENO));
+ 
+-  CommandLine line(path);
+   base::LaunchOptions options;
+   options.fds_to_remap = &fd_map;
+   int process_id;
+-  if (!base::LaunchProcess(line, options, &process_id)) {
++  if (!base::LaunchProcess(command_line, options, &process_id)) {
+     LOG(ERROR) << "Error launching process";
+     return false;
+   }
+diff --git a/chrome/browser/extensions/api/messaging/native_process_launcher_win.cc b/chrome/browser/extensions/api/messaging/native_process_launcher_win.cc
+index 382f482..931de35 100644
+--- a/chrome/browser/extensions/api/messaging/native_process_launcher_win.cc
++++ b/chrome/browser/extensions/api/messaging/native_process_launcher_win.cc
+@@ -64,7 +64,7 @@ NativeProcessLauncher::FindAndLoadManifest(
+ 
+ // static
+ bool NativeProcessLauncher::LaunchNativeProcess(
+-    const base::FilePath& path,
++    const CommandLine& command_line,
+     base::PlatformFile* read_file,
+     base::PlatformFile* write_file) {
+   // Timeout for the IO pipes.
+@@ -74,7 +74,7 @@ bool NativeProcessLauncher::LaunchNativeProcess(
+   // CreateNamedPipeW().
+   const DWORD kBufferSize = 0;
+ 
+-  if (!path.IsAbsolute()) {
++  if (!command_line.GetProgram().IsAbsolute()) {
+     LOG(ERROR) << "Native Messaging host path must be absolute.";
+     return false;
+   }
+@@ -117,20 +117,23 @@ bool NativeProcessLauncher::LaunchNativeProcess(
+   scoped_ptr<wchar_t[]> comspec(new wchar_t[comspec_length]);
+   ::GetEnvironmentVariable(L"COMSPEC", comspec.get(), comspec_length);
+ 
++  string16 command_line_string = command_line.GetCommandLineString();
++
+   // 'start' command has a moronic syntax: if first argument is quoted then it
+-  // interprets it as a command title. Host path must always be in quotes, so
++  // interprets it as a command title. Host path may need to be in quotes, so
+   // we always need to specify the title as the first argument.
+   string16 command = base::StringPrintf(
+       L"%ls /c start \"Chrome Native Messaging Host\" /b "
+-      L"\"%ls\" < %ls > %ls",
+-      comspec.get(), path.value().c_str(),
++      L"%ls < %ls > %ls",
++      comspec.get(), command_line_string.c_str(),
+       in_pipe_name.c_str(), out_pipe_name.c_str());
+ 
+   base::LaunchOptions options;
+   options.start_hidden = true;
+   base::ProcessHandle cmd_handle;
+   if (!base::LaunchProcess(command.c_str(), options, &cmd_handle)) {
+-    LOG(ERROR) << "Error launching process " << path.MaybeAsASCII();
++    LOG(ERROR) << "Error launching process "
++               << command_line.GetProgram().MaybeAsASCII();
+     return false;
+   }
+ 
+@@ -142,7 +145,7 @@ bool NativeProcessLauncher::LaunchNativeProcess(
+     base::KillProcess(cmd_handle, 0, false);
+     base::CloseProcessHandle(cmd_handle);
+     LOG(ERROR) << "Failed to connect IO pipes when starting "
+-               << path.MaybeAsASCII();
++               << command_line.GetProgram().MaybeAsASCII();
+     return false;
+   }
+ 
+diff --git a/chrome/test/data/extensions/api_test/native_messaging/test.js b/chrome/test/data/extensions/api_test/native_messaging/test.js
+index 2715a42..ab01956 100644
+--- a/chrome/test/data/extensions/api_test/native_messaging/test.js
++++ b/chrome/test/data/extensions/api_test/native_messaging/test.js
+@@ -11,9 +11,11 @@ chrome.test.getConfig(function(config) {
+         var message = {"text": "Hi there!", "number": 3};
+         chrome.runtime.sendNativeMessage(
+             appName, message,
+-            chrome.test.callbackPass(function(nativeResponse) {
+-          var expectedResponse = {"id": 1, "echo": message};
+-          chrome.test.assertEq(expectedResponse, nativeResponse);
++            chrome.test.callbackPass(function(response) {
++          chrome.test.assertEq(1, response.id);
++          chrome.test.assertEq(message, response.echo);
++          chrome.test.assertEq(
++              response.caller_url, window.location.origin + "/");
+         }));
+       },
+ 
+@@ -28,19 +30,19 @@ chrome.test.getConfig(function(config) {
+         var messagesToSend = [{"text": "foo"},
+                               {"text": "bar", "funCount": 9001},
+                               {}];
+-        var expectedResponses = [{"id": 1, "echo": messagesToSend[0]},
+-                                 {"id": 2, "echo": messagesToSend[1]},
+-                                 {"id": 3, "echo": messagesToSend[2]}];
+         var currentMessage = 0;
+ 
+         port = chrome.extension.connectNative(appName);
+         port.postMessage(messagesToSend[currentMessage]);
+ 
+         port.onMessage.addListener(function(message) {
+-          chrome.test.assertEq(expectedResponses[currentMessage], message);
++          chrome.test.assertEq(currentMessage + 1, message.id);
++          chrome.test.assertEq(messagesToSend[currentMessage], message.echo);
++          chrome.test.assertEq(
++              message.caller_url, window.location.origin + "/");
+           currentMessage++;
+ 
+-          if (currentMessage == expectedResponses.length)
++          if (currentMessage == messagesToSend.length)
+             chrome.test.notifyPass();
+           else
+             port.postMessage(messagesToSend[currentMessage]);
+diff --git a/chrome/test/data/native_messaging/native_hosts/echo.py b/chrome/test/data/native_messaging/native_hosts/echo.py
+index d0be74b..96c19f7 100755
+--- a/chrome/test/data/native_messaging/native_hosts/echo.py
++++ b/chrome/test/data/native_messaging/native_hosts/echo.py
+@@ -12,6 +12,11 @@ import struct
+ def Main():
+   message_number = 0
+ 
++  if len(sys.argv) < 2:
++    sys.stderr.write("URL of the calling application is not specified.\n")
++    return;
++  caller_url = sys.argv[1]
++
+   while 1:
+     # Read the message type (first 4 bytes).
+     text_length_bytes = sys.stdin.read(4)
+@@ -27,8 +32,8 @@ def Main():
+ 
+     message_number += 1
+ 
+-    response = '{{"id": {0}, "echo": {1}}}'.format(message_number,
+-                                                   text).encode('utf-8')
++    response = '{{"id": {0}, "echo": {1}, "caller_url": "{2}"}}'.format(
++        message_number, text, caller_url).encode('utf-8')
+ 
+     try:
+       sys.stdout.write(struct.pack("I", len(response)))
+
+commit 6d65223d5129c232db8e8650f578e2d070263dfd
+Author: alexeypa@chromium.org <alexeypa@chromium.org@0039d316-1c4b-4281-b951-d872f2087c98>
+Date:   Tue Mar 5 20:32:46 2013 +0000
+
+    Initialize COM and configure security settings in the daemon.
+    
+    This CL initializes a single-threaded apartment on the main thread in the daemon and configures COM security in the following way:
+      - The daemon authenticates that all data received is from the expected client.
+      - The daemon can impersonate clients to check their identity but cannot act on their behalf.
+      - The caller's identity on every call (Dynamic cloaking).
+      - Activations where the activated COM server would run under the daemon's identity are prohibited.
+    
+    BUG=137696
+    
+    Review URL: https://codereview.chromium.org/12378078
+    
+    git-svn-id: svn://svn.chromium.org/chrome/trunk/src@186245 0039d316-1c4b-4281-b951-d872f2087c98
+
+diff --git a/remoting/host/desktop_session_win.cc b/remoting/host/desktop_session_win.cc
+index 182111d..453de2b 100644
+--- a/remoting/host/desktop_session_win.cc
++++ b/remoting/host/desktop_session_win.cc
+@@ -23,7 +23,7 @@ using base::win::ScopedHandle;
+ namespace {
+ 
+ // The security descriptor of the daemon IPC endpoint. It gives full access
+-// to LocalSystem and denies access by anyone else.
++// to SYSTEM and denies access by anyone else.
+ const char kDaemonIpcSecurityDescriptor[] = "O:SYG:SYD:(A;;GA;;;SY)";
+ 
+ // The command line parameters that should be copied from the service's command
+diff --git a/remoting/host/installer/win/chromoting.wxs b/remoting/host/installer/win/chromoting.wxs
+index a88b4a4..fd0cbfd 100644
+--- a/remoting/host/installer/win/chromoting.wxs
++++ b/remoting/host/installer/win/chromoting.wxs
+@@ -56,7 +56,7 @@
+ 
+   <!--
+     A security descriptor that gives SYSTEM, built-in administrators and
+-    LocalSystem accounts COM_RIGHTS_EXECUTE, COM_RIGHTS_EXECUTE_LOCAL, and
++    LocalService accounts COM_RIGHTS_EXECUTE, COM_RIGHTS_EXECUTE_LOCAL, and
+     COM_RIGHTS_ACTIVATE_LOCAL rights. It specifies a mandatory label that
+     specifies "no execute up" policy for medium integrity level.
+ 
+diff --git a/remoting/host/win/host_service.cc b/remoting/host/win/host_service.cc
+index 71ef8b2..b760b0f 100644
+--- a/remoting/host/win/host_service.cc
++++ b/remoting/host/win/host_service.cc
+@@ -7,6 +7,7 @@
+ 
+ #include "remoting/host/win/host_service.h"
+ 
++#include <sddl.h>
+ #include <windows.h>
+ #include <wtsapi32.h>
+ 
+@@ -21,6 +22,7 @@
+ #include "base/single_thread_task_runner.h"
+ #include "base/threading/thread.h"
+ #include "base/utf_string_conversions.h"
++#include "base/win/scoped_com_initializer.h"
+ #include "base/win/wrapped_window_proc.h"
+ #include "remoting/base/auto_thread.h"
+ #include "remoting/base/scoped_sc_handle_win.h"
+@@ -28,6 +30,7 @@
+ #include "remoting/host/branding.h"
+ #include "remoting/host/host_exit_codes.h"
+ #include "remoting/host/logging.h"
++#include "remoting/host/win/security_descriptor.h"
+ 
+ #if defined(REMOTING_MULTI_PROCESS)
+ #include "remoting/host/daemon_process.h"
+@@ -40,6 +43,8 @@
+ #include "remoting/host/win/wts_console_session_process_driver.h"
+ #endif  // !defined(REMOTING_MULTI_PROCESS)
+ 
++namespace remoting {
++
+ namespace {
+ 
+ // Used to query the endpoint of an attached RDP client.
+@@ -60,9 +65,78 @@ const wchar_t kSessionNotificationWindowClass[] =
+ // "--console" runs the service interactively for debugging purposes.
+ const char kConsoleSwitchName[] = "console";
+ 
+-}  // namespace
++// Concatenates ACE type, permissions and sid given as SDDL strings into an ACE
++// definition in SDDL form.
++#define SDDL_ACE(type, permissions, sid) \
++    L"(" type L";;" permissions L";;;" sid L")"
++
++// Text representation of COM_RIGHTS_EXECUTE and COM_RIGHTS_EXECUTE_LOCAL
++// permission bits that is used in the SDDL definition below.
++#define SDDL_COM_EXECUTE_LOCAL L"0x3"
++
++// A security descriptor allowing local processes running under SYSTEM or
++// LocalService accounts at medium integrity level or higher to call COM
++// methods exposed by the daemon.
++const wchar_t kComProcessSd[] =
++    SDDL_OWNER L":" SDDL_LOCAL_SYSTEM
++    SDDL_GROUP L":" SDDL_LOCAL_SYSTEM
++    SDDL_DACL L":"
++    SDDL_ACE(SDDL_ACCESS_ALLOWED, SDDL_COM_EXECUTE_LOCAL, SDDL_LOCAL_SYSTEM)
++    SDDL_ACE(SDDL_ACCESS_ALLOWED, SDDL_COM_EXECUTE_LOCAL, SDDL_LOCAL_SERVICE)
++    SDDL_SACL L":"
++    SDDL_ACE(SDDL_MANDATORY_LABEL, SDDL_NO_EXECUTE_UP, SDDL_ML_MEDIUM);
++
++#undef SDDL_ACE
++#undef SDDL_COM_EXECUTE_LOCAL
++
++// Allows incoming calls from clients running under SYSTEM or LocalService at
++// medium integrity level.
++bool InitializeComSecurity() {
++  // Convert the SDDL description into a security descriptor in absolute format.
++  ScopedSd relative_sd = ConvertSddlToSd(WideToUTF8(kComProcessSd));
++  if (!relative_sd) {
++    LOG_GETLASTERROR(ERROR) << "Failed to create a security descriptor";
++    return false;
++  }
++  ScopedSd absolute_sd;
++  ScopedAcl dacl;
++  ScopedSid group;
++  ScopedSid owner;
++  ScopedAcl sacl;
++  if (!MakeScopedAbsoluteSd(relative_sd, &absolute_sd, &dacl, &group, &owner,
++                            &sacl)) {
++    LOG_GETLASTERROR(ERROR) << "MakeScopedAbsoluteSd() failed";
++    return false;
++  }
+ 
+-namespace remoting {
++  // Apply the security descriptor and the following settings:
++  //   - The daemon authenticates that all data received is from the expected
++  //     client.
++  //   - The daemon can impersonate clients to check their identity but cannot
++  //     act on their behalf.
++  //   - The caller's identity on every call (Dynamic cloaking).
++  //   - Activations where the activated COM server would run under the daemon's
++  //     identity are prohibited.
++  HRESULT result = CoInitializeSecurity(
++      absolute_sd.get(),
++      -1,       // Let COM choose which authentication services to register.
++      NULL,     // See above.
++      NULL,     // Reserved, must be NULL.
++      RPC_C_AUTHN_LEVEL_PKT_PRIVACY,
++      RPC_C_IMP_LEVEL_IDENTIFY,
++      NULL,     // Default authentication information is not provided.
++      EOAC_DYNAMIC_CLOAKING | EOAC_DISABLE_AAA,
++      NULL);    /// Reserved, must be NULL
++  if (FAILED(result)) {
++    LOG(ERROR) << "CoInitializeSecurity() failed, result=0x"
++               << std::hex << result << std::dec << ".";
++    return false;
++  }
++
++  return true;
++}
++
++}  // namespace
+ 
+ HostService* HostService::GetInstance() {
+   return Singleton<HostService>::get();
+@@ -388,7 +462,7 @@ int HostService::RunAsService() {
+ }
+ 
+ void HostService::RunAsServiceImpl() {
+-  MessageLoop message_loop(MessageLoop::TYPE_DEFAULT);
++  MessageLoop message_loop(MessageLoop::TYPE_UI);
+   base::RunLoop run_loop;
+   main_task_runner_ = message_loop.message_loop_proxy();
+ 
+@@ -416,6 +490,14 @@ void HostService::RunAsServiceImpl() {
+     return;
+   }
+ 
++  // Initialize COM.
++  base::win::ScopedCOMInitializer com_initializer;
++  if (!com_initializer.succeeded())
++    return;
++
++  if (!InitializeComSecurity())
++    return;
++
+   CreateLauncher(scoped_refptr<AutoThreadTaskRunner>(
+       new AutoThreadTaskRunner(main_task_runner_,
+                                run_loop.QuitClosure())));
+@@ -440,6 +522,14 @@ int HostService::RunInConsole() {
+ 
+   int result = kInitializationFailed;
+ 
++  // Initialize COM.
++  base::win::ScopedCOMInitializer com_initializer;
++  if (!com_initializer.succeeded())
++    return result;
++
++  if (!InitializeComSecurity())
++    return result;
++
+   // Subscribe to Ctrl-C and other console events.
+   if (!SetConsoleCtrlHandler(&HostService::ConsoleControlHandler, TRUE)) {
+     LOG_GETLASTERROR(ERROR)
+diff --git a/remoting/host/win/security_descriptor.cc b/remoting/host/win/security_descriptor.cc
+index 60e1012..1f53505 100644
+--- a/remoting/host/win/security_descriptor.cc
++++ b/remoting/host/win/security_descriptor.cc
+@@ -65,4 +65,61 @@ ScopedSid GetLogonSid(HANDLE token) {
+   return ScopedSid();
+ }
+ 
++bool MakeScopedAbsoluteSd(const ScopedSd& relative_sd,
++                          ScopedSd* absolute_sd,
++                          ScopedAcl* dacl,
++                          ScopedSid* group,
++                          ScopedSid* owner,
++                          ScopedAcl* sacl) {
++  // Get buffer sizes.
++  DWORD absolute_sd_size = 0;
++  DWORD dacl_size = 0;
++  DWORD group_size = 0;
++  DWORD owner_size = 0;
++  DWORD sacl_size = 0;
++  if (MakeAbsoluteSD(relative_sd.get(),
++                     NULL,
++                     &absolute_sd_size,
++                     NULL,
++                     &dacl_size,
++                     NULL,
++                     &sacl_size,
++                     NULL,
++                     &owner_size,
++                     NULL,
++                     &group_size) ||
++      GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
++    return false;
++  }
++
++  // Allocate buffers.
++  ScopedSd local_absolute_sd(absolute_sd_size);
++  ScopedAcl local_dacl(dacl_size);
++  ScopedSid local_group(group_size);
++  ScopedSid local_owner(owner_size);
++  ScopedAcl local_sacl(sacl_size);
++
++  // Do the conversion.
++  if (!MakeAbsoluteSD(relative_sd.get(),
++                      local_absolute_sd.get(),
++                      &absolute_sd_size,
++                      local_dacl.get(),
++                      &dacl_size,
++                      local_sacl.get(),
++                      &sacl_size,
++                      local_owner.get(),
++                      &owner_size,
++                      local_group.get(),
++                      &group_size)) {
++    return false;
++  }
++
++  absolute_sd->Swap(local_absolute_sd);
++  dacl->Swap(local_dacl);
++  group->Swap(local_group);
++  owner->Swap(local_owner);
++  sacl->Swap(local_sacl);
++  return true;
++}
++
+ }  // namespace remoting
+diff --git a/remoting/host/win/security_descriptor.h b/remoting/host/win/security_descriptor.h
+index 98713f8..e83948e 100644
+--- a/remoting/host/win/security_descriptor.h
++++ b/remoting/host/win/security_descriptor.h
+@@ -13,6 +13,7 @@
+ 
+ namespace remoting {
+ 
++typedef TypedBuffer<ACL> ScopedAcl;
+ typedef TypedBuffer<SECURITY_DESCRIPTOR> ScopedSd;
+ typedef TypedBuffer<SID> ScopedSid;
+ 
+@@ -26,6 +27,15 @@ std::string ConvertSidToString(SID* sid);
+ // a logon SID or in case of an error.
+ ScopedSid GetLogonSid(HANDLE token);
+ 
++// Converts a security descriptor in self-relative format to a security
++// descriptor in absolute format.
++bool MakeScopedAbsoluteSd(const ScopedSd& relative_sd,
++                          ScopedSd* absolute_sd,
++                          ScopedAcl* dacl,
++                          ScopedSid* group,
++                          ScopedSid* owner,
++                          ScopedAcl* sacl);
++
+ }  // namespace remoting
+ 
+ #endif  // REMOTING_HOST_WIN_SECURITY_DESCRIPTOR_H_
+
+commit a78886f4bb23fde9ca9907884d6651d55883c79a
+Author: tedchoc@chromium.org <tedchoc@chromium.org@0039d316-1c4b-4281-b951-d872f2087c98>
+Date:   Mon Mar 4 23:18:00 2013 +0000
+
+    Allow querying the security level at the Tab level.
+    
+    Also, use a template for generating the SecurityLevel constants to allow them to be shared in C++ and Java.
+    
+    For another example of using the templates, take a look at this CL that generated the PageTransitionTypes:
+    https://codereview.chromium.org/11577016
+    
+    BUG=174361
+    
+    Review URL: https://chromiumcodereview.appspot.com/12391024
+    
+    git-svn-id: svn://svn.chromium.org/chrome/trunk/src@186021 0039d316-1c4b-4281-b951-d872f2087c98
+
+diff --git a/chrome/android/java/ToolbarModelSecurityLevel.template b/chrome/android/java/ToolbarModelSecurityLevel.template
+new file mode 100644
+index 0000000..1e03c69
+--- /dev/null
++++ b/chrome/android/java/ToolbarModelSecurityLevel.template
+@@ -0,0 +1,11 @@
++// Copyright (c) 2013 The Chromium Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++package org.chromium.chrome.browser.ui.toolbar;
++
++public class ToolbarModelSecurityLevel {
++#define DEFINE_TOOLBAR_MODEL_SECURITY_LEVEL(name,value) public static final \
++  int TOOLBAR_MODEL_SECURITY_LEVEL_ ## name = value;
++#include "chrome/browser/ui/toolbar/toolbar_model_security_level_list.h"
++}
+diff --git a/chrome/browser/android/tab_android.cc b/chrome/browser/android/tab_android.cc
+index 63120e5..16acaae 100644
+--- a/chrome/browser/android/tab_android.cc
++++ b/chrome/browser/android/tab_android.cc
+@@ -25,6 +25,7 @@
+ #include "chrome/browser/ui/prefs/prefs_tab_helper.h"
+ #include "chrome/browser/ui/sync/tab_contents_synced_tab_delegate.h"
+ #include "chrome/browser/ui/tab_contents/core_tab_helper.h"
++#include "chrome/browser/ui/toolbar/toolbar_model_impl.h"
+ #include "chrome/browser/view_type_utils.h"
+ #include "content/public/browser/android/content_view_core.h"
+ #include "content/public/browser/web_contents.h"
+@@ -105,5 +106,13 @@ TabAndroid::TabAndroid() : tab_id_(-1) {
+ TabAndroid::~TabAndroid() {
+ }
+ 
++content::WebContents* TabAndroid::GetWebContents() {
++  return NULL;
++}
++
++ToolbarModel::SecurityLevel TabAndroid::GetSecurityLevel() {
++  return ToolbarModelImpl::GetSecurityLevelForWebContents(GetWebContents());
++}
++
+ void TabAndroid::RunExternalProtocolDialog(const GURL& url) {
+ }
+diff --git a/chrome/browser/android/tab_android.h b/chrome/browser/android/tab_android.h
+index 81c2c35..bba62a4 100644
+--- a/chrome/browser/android/tab_android.h
++++ b/chrome/browser/android/tab_android.h
+@@ -10,6 +10,7 @@
+ #include "base/android/scoped_java_ref.h"
+ #include "base/callback_forward.h"
+ #include "base/string16.h"
++#include "chrome/browser/ui/toolbar/toolbar_model.h"
+ 
+ class GURL;
+ class SkBitmap;
+@@ -33,8 +34,13 @@ class TabAndroid {
+ 
+   static TabAndroid* GetNativeTab(JNIEnv* env, jobject obj);
+ 
++  // TODO(tedchoc): Make pure virtual once all derived classes can be updated.
++  virtual content::WebContents* GetWebContents();
++
+   virtual browser_sync::SyncedTabDelegate* GetSyncedTabDelegate() = 0;
+ 
++  virtual ToolbarModel::SecurityLevel GetSecurityLevel();
++
+   int id() const {
+     return tab_id_;
+   }
+@@ -56,8 +62,9 @@ class TabAndroid {
+   virtual void AddShortcutToBookmark(
+       const GURL& url, const string16& title, const SkBitmap& skbitmap,
+       int r_value, int g_value, int b_value) = 0;
+-  // TODO(tedchoc): Make pure virtual once all derived classes can be updated.
+-  virtual void EditBookmark(int64 node_id, bool is_folder) {}
++
++  // Called when a bookmark node should be edited.
++  virtual void EditBookmark(int64 node_id, bool is_folder) = 0;
+ 
+   // Called when the common ExternalProtocolHandler wants to
+   // run the external protocol dialog.
+diff --git a/chrome/browser/android/tab_base_android_impl.cc b/chrome/browser/android/tab_base_android_impl.cc
+index 28e9716..b25770b 100644
+--- a/chrome/browser/android/tab_base_android_impl.cc
++++ b/chrome/browser/android/tab_base_android_impl.cc
+@@ -39,6 +39,10 @@ void TabBaseAndroidImpl::Destroy(JNIEnv* env, jobject obj) {
+   delete this;
+ }
+ 
++WebContents* TabBaseAndroidImpl::GetWebContents() {
++  return web_contents_.get();
++}
++
+ browser_sync::SyncedTabDelegate* TabBaseAndroidImpl::GetSyncedTabDelegate() {
+   NOTIMPLEMENTED();
+   return NULL;
+diff --git a/chrome/browser/android/tab_base_android_impl.h b/chrome/browser/android/tab_base_android_impl.h
+index 13622e4..bc5659e 100644
+--- a/chrome/browser/android/tab_base_android_impl.h
++++ b/chrome/browser/android/tab_base_android_impl.h
+@@ -40,6 +40,8 @@ class TabBaseAndroidImpl : public TabAndroid {
+   // --------------------------------------------------------------------------
+   // TabAndroid Methods
+   // --------------------------------------------------------------------------
++  virtual content::WebContents* GetWebContents() OVERRIDE;
++
+   virtual browser_sync::SyncedTabDelegate* GetSyncedTabDelegate() OVERRIDE;
+ 
+   virtual void OnReceivedHttpAuthRequest(jobject auth_handler,
+diff --git a/chrome/browser/ui/toolbar/toolbar_model.h b/chrome/browser/ui/toolbar/toolbar_model.h
+index e25e66e..8d2d9cc 100644
+--- a/chrome/browser/ui/toolbar/toolbar_model.h
++++ b/chrome/browser/ui/toolbar/toolbar_model.h
+@@ -24,13 +24,9 @@ class ToolbarModel {
+   // don't need two sets of security UI levels.  SECURITY_STYLE_AUTHENTICATED
+   // needs to be refined into three levels: warning, standard, and EV.
+   enum SecurityLevel {
+-    NONE = 0,          // HTTP/no URL/user is editing
+-    EV_SECURE,         // HTTPS with valid EV cert
+-    SECURE,            // HTTPS (non-EV)
+-    SECURITY_WARNING,  // HTTPS, but unable to check certificate revocation
+-                       // status or with insecure content on the page
+-    SECURITY_ERROR,    // Attempted HTTPS and failed, page not authenticated
+-    NUM_SECURITY_LEVELS,
++#define DEFINE_TOOLBAR_MODEL_SECURITY_LEVEL(name,value)  name = value,
++#include "chrome/browser/ui/toolbar/toolbar_model_security_level_list.h"
++#undef DEFINE_TOOLBAR_MODEL_SECURITY_LEVEL
+   };
+ 
+   virtual ~ToolbarModel() {}
+diff --git a/chrome/browser/ui/toolbar/toolbar_model_security_level_list.h b/chrome/browser/ui/toolbar/toolbar_model_security_level_list.h
+new file mode 100644
+index 0000000..b49bd41
+--- /dev/null
++++ b/chrome/browser/ui/toolbar/toolbar_model_security_level_list.h
+@@ -0,0 +1,29 @@
++// Copyright (c) 2013 The Chromium Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++// Intentionally no include guards because this file is meant to be included
++// inside a macro to generate enum values.
++
++#ifndef DEFINE_TOOLBAR_MODEL_SECURITY_LEVEL
++#error "Please define DEFINE_TOOLBAR_MODEL_SECURITY_LEVEL before including \
++  this file."
++#endif
++
++// HTTP/no URL/user is editing
++DEFINE_TOOLBAR_MODEL_SECURITY_LEVEL(NONE, 0)
++
++// HTTPS with valid EV cert
++DEFINE_TOOLBAR_MODEL_SECURITY_LEVEL(EV_SECURE, 1)
++
++// HTTPS (non-EV)
++DEFINE_TOOLBAR_MODEL_SECURITY_LEVEL(SECURE, 2)
++
++// HTTPS, but unable to check certificate revocation status or with insecure
++// content on the page
++DEFINE_TOOLBAR_MODEL_SECURITY_LEVEL(SECURITY_WARNING, 3)
++
++// Attempted HTTPS and failed, page not authenticated
++DEFINE_TOOLBAR_MODEL_SECURITY_LEVEL(SECURITY_ERROR, 4)
++
++DEFINE_TOOLBAR_MODEL_SECURITY_LEVEL(NUM_SECURITY_LEVELS, 5)
+diff --git a/chrome/chrome.gyp b/chrome/chrome.gyp
+index b6027c0..224392c 100644
+--- a/chrome/chrome.gyp
++++ b/chrome/chrome.gyp
+@@ -1080,6 +1080,7 @@
+           'target_name': 'chrome_java',
+           'type': 'none',
+           'dependencies': [
++            'toolbar_model_security_levels_java',
+             '../base/base.gyp:base',
+             '../components/components.gyp:navigation_interception_java',
+             '../components/components.gyp:web_contents_delegate_android_java',
+diff --git a/chrome/chrome_browser.gypi b/chrome/chrome_browser.gypi
+index 79e56ae..a7ce11d 100644
+--- a/chrome/chrome_browser.gypi
++++ b/chrome/chrome_browser.gypi
+@@ -3143,6 +3143,18 @@
+           },
+           'includes': [ '../build/jni_generator.gypi' ],
+         },
++        {
++          'target_name': 'toolbar_model_security_levels_java',
++          'type': 'none',
++          'sources': [
++            'android/java/ToolbarModelSecurityLevel.template',
++          ],
++          'variables': {
++            'package_name': 'org/chromium/chrome/browser/ui/toolbar',
++            'template_deps': ['browser/ui/toolbar/toolbar_model_security_level_list.h'],
++          },
++          'includes': [ '../build/android/java_cpp_template.gypi' ],
++        },
+       ],
+      },
+     ],
+diff --git a/chrome/chrome_browser_ui.gypi b/chrome/chrome_browser_ui.gypi
+index 278b737..93826fc 100644
+--- a/chrome/chrome_browser_ui.gypi
++++ b/chrome/chrome_browser_ui.gypi
+@@ -1368,6 +1368,7 @@
+         'browser/ui/toolbar/toolbar_model_impl.cc',
+         'browser/ui/toolbar/toolbar_model_impl.h',
+         'browser/ui/toolbar/toolbar_model_delegate.h',
++        'browser/ui/toolbar/toolbar_model_security_level_list.h',
+         'browser/ui/toolbar/wrench_menu_model.cc',
+         'browser/ui/toolbar/wrench_menu_model.h',
+         'browser/ui/top_level_widget.h',
+@@ -2641,6 +2642,7 @@
+             ['include', '^browser/ui/toolbar/toolbar_model\\.(cc|h)$'],
+             ['include', '^browser/ui/toolbar/toolbar_model_delegate\\.(cc|h)$'],
+             ['include', '^browser/ui/toolbar/toolbar_model_impl\\.(cc|h)$'],
++            ['include', '^browser/ui/toolbar/toolbar_model_security_level_list\\.h$'],
+             ['exclude', '^browser/ui/webui/downloads_'],
+             ['exclude', '^browser/ui/webui/feedback_'],
+             ['exclude', '^browser/ui/webui/help/'],
+
+commit db022e4b81125336f3ed9b8f4ae3e98cdd253e85
+Author: tedchoc@chromium.org <tedchoc@chromium.org@0039d316-1c4b-4281-b951-d872f2087c98>
+Date:   Thu Feb 28 17:43:49 2013 +0000
+
+    Revert 184999
+    > Revert 184869
+    >
+    > This revert seems like it caused test failures in FileSystemApiOpenBackgroundTest and
+    > FileSystemApiSaveBackgroundTest on linux.
+    >
+    > http://build.chromium.org/p/chromium.linux/builders/Linux%20Tests%20%28dbg%29%281%29/builds/23657
+    >
+    > In particular, this change could change the security level of background pages (pages with no
+    > web contents), and therefore seems to be a reasonable culprit.
+    >
+    > Apologies if this turns out to be misdirected.  We've been starting at these red bots (on linux
+    > and chromeos, e.g., http://build.chromium.org/p/chromium.chromiumos/builders/Linux%20ChromiumOS%20Tests%20%282%29/builds/12033 )
+    > for a while now.  We even rolled about another change in the same blamelist, but that
+    > didn't appear to help, possibly even made things worse.
+    >
+    > > Expose the utility for getting the SecurityLevel for any WebContents.
+    > >
+    > > On android, we need handle rendering more than one location bar for a
+    > > given "window" so the ability to query the security level without updating
+    > > the concept of the active WebContents to the toolbar model.
+    > >
+    > > BUG=
+    > >
+    > >
+    > > Review URL: https://chromiumcodereview.appspot.com/12314119
+    >
+    > TBR=tedchoc@chromium.org
+    > Review URL: https://codereview.chromium.org/12334129
+    
+    TBR=mpearson@chromium.org
+    Review URL: https://codereview.chromium.org/12378017
+    
+    git-svn-id: svn://svn.chromium.org/chrome/trunk/src@185272 0039d316-1c4b-4281-b951-d872f2087c98
+
+diff --git a/chrome/browser/ui/toolbar/toolbar_model_impl.cc b/chrome/browser/ui/toolbar/toolbar_model_impl.cc
+index 04c6f3a4..37b47c4 100644
+--- a/chrome/browser/ui/toolbar/toolbar_model_impl.cc
++++ b/chrome/browser/ui/toolbar/toolbar_model_impl.cc
+@@ -47,6 +47,42 @@ ToolbarModelImpl::ToolbarModelImpl(ToolbarModelDelegate* delegate)
+ ToolbarModelImpl::~ToolbarModelImpl() {
+ }
+ 
++ToolbarModel::SecurityLevel ToolbarModelImpl::GetSecurityLevelForWebContents(
++      content::WebContents* web_contents) {
++  if (!web_contents)
++    return NONE;
++
++  NavigationEntry* entry = web_contents->GetController().GetVisibleEntry();
++  if (!entry)
++    return NONE;
++
++  const SSLStatus& ssl = entry->GetSSL();
++  switch (ssl.security_style) {
++    case content::SECURITY_STYLE_UNKNOWN:
++    case content::SECURITY_STYLE_UNAUTHENTICATED:
++      return NONE;
++
++    case content::SECURITY_STYLE_AUTHENTICATION_BROKEN:
++      return SECURITY_ERROR;
++
++    case content::SECURITY_STYLE_AUTHENTICATED:
++      if (!!(ssl.content_status & SSLStatus::DISPLAYED_INSECURE_CONTENT))
++        return SECURITY_WARNING;
++      if (net::IsCertStatusError(ssl.cert_status)) {
++        DCHECK(net::IsCertStatusMinorError(ssl.cert_status));
++        return SECURITY_WARNING;
++      }
++      if ((ssl.cert_status & net::CERT_STATUS_IS_EV) &&
++          content::CertStore::GetInstance()->RetrieveCert(ssl.cert_id, NULL))
++        return EV_SECURE;
++      return SECURE;
++
++    default:
++      NOTREACHED();
++      return NONE;
++  }
++}
++
+ // ToolbarModelImpl Implementation.
+ string16 ToolbarModelImpl::GetText(
+     bool display_search_urls_as_search_terms) const {
+@@ -121,43 +157,11 @@ bool ToolbarModelImpl::ShouldDisplayURL() const {
+   return true;
+ }
+ 
+-ToolbarModelImpl::SecurityLevel ToolbarModelImpl::GetSecurityLevel() const {
++ToolbarModel::SecurityLevel ToolbarModelImpl::GetSecurityLevel() const {
+   if (input_in_progress_)  // When editing, assume no security style.
+     return NONE;
+ 
+-  NavigationController* navigation_controller = GetNavigationController();
+-  if (!navigation_controller)  // We might not have a controller on init.
+-    return NONE;
+-
+-  NavigationEntry* entry = navigation_controller->GetVisibleEntry();
+-  if (!entry)
+-    return NONE;
+-
+-  const SSLStatus& ssl = entry->GetSSL();
+-  switch (ssl.security_style) {
+-    case content::SECURITY_STYLE_UNKNOWN:
+-    case content::SECURITY_STYLE_UNAUTHENTICATED:
+-      return NONE;
+-
+-    case content::SECURITY_STYLE_AUTHENTICATION_BROKEN:
+-      return SECURITY_ERROR;
+-
+-    case content::SECURITY_STYLE_AUTHENTICATED:
+-      if (!!(ssl.content_status & SSLStatus::DISPLAYED_INSECURE_CONTENT))
+-        return SECURITY_WARNING;
+-      if (net::IsCertStatusError(ssl.cert_status)) {
+-        DCHECK(net::IsCertStatusMinorError(ssl.cert_status));
+-        return SECURITY_WARNING;
+-      }
+-      if ((ssl.cert_status & net::CERT_STATUS_IS_EV) &&
+-          content::CertStore::GetInstance()->RetrieveCert(ssl.cert_id, NULL))
+-        return EV_SECURE;
+-      return SECURE;
+-
+-    default:
+-      NOTREACHED();
+-      return NONE;
+-  }
++  return GetSecurityLevelForWebContents(delegate_->GetActiveWebContents());
+ }
+ 
+ int ToolbarModelImpl::GetIcon() const {
+diff --git a/chrome/browser/ui/toolbar/toolbar_model_impl.h b/chrome/browser/ui/toolbar/toolbar_model_impl.h
+index 91843a7..1adf474 100644
+--- a/chrome/browser/ui/toolbar/toolbar_model_impl.h
++++ b/chrome/browser/ui/toolbar/toolbar_model_impl.h
+@@ -18,6 +18,7 @@ class ToolbarModelDelegate;
+ 
+ namespace content {
+ class NavigationController;
++class WebContents;
+ }
+ 
+ namespace net {
+@@ -32,6 +33,9 @@ class ToolbarModelImpl : public ToolbarModel {
+   explicit ToolbarModelImpl(ToolbarModelDelegate* delegate);
+   virtual ~ToolbarModelImpl();
+ 
++  static SecurityLevel GetSecurityLevelForWebContents(
++      content::WebContents* web_contents);
++
+   // Overriden from ToolbarModel.
+   virtual string16 GetText(
+       bool display_search_urls_as_search_terms) const OVERRIDE;
+
+commit d980d065a42772a1196342c727b0377d0590f512
+Author: tsepez@chromium.org <tsepez@chromium.org@0039d316-1c4b-4281-b951-d872f2087c98>
+Date:   Thu Feb 28 02:37:40 2013 +0000
+
+    Add security team members as owners of IPC message files.  This ownership
+    was lost during a directory rename operation.
+    
+    TBR=jbauman@chromium.org
+    
+    Review URL: https://chromiumcodereview.appspot.com/12335150
+    
+    git-svn-id: svn://svn.chromium.org/chrome/trunk/src@185122 0039d316-1c4b-4281-b951-d872f2087c98
+
+diff --git a/components/tracing/OWNERS b/components/tracing/OWNERS
+index ba7dc1b..a73665a 100644
+--- a/components/tracing/OWNERS
++++ b/components/tracing/OWNERS
+@@ -1,2 +1,11 @@
+ jbauman@chromium.org
+ nduca@chromium.org
++
++# Changes to IPC messages require a security review to avoid introducing
++# new sandbox escapes.
++per-file *_messages.h=set noparent
++per-file *_messages.h=cdn@chromium.org
++per-file *_messages.h=jln@chromium.org
++per-file *_messages.h=jschuh@chromium.org
++per-file *_messages.h=palmer@chromium.org
++per-file *_messages.h=tsepez@chromium.org
+
+commit 0b3933f9f2d908fb8e677815dfc3b13dbe13b42b
+Author: mpearson@chromium.org <mpearson@chromium.org@0039d316-1c4b-4281-b951-d872f2087c98>
+Date:   Wed Feb 27 19:07:55 2013 +0000
+
+    Revert 184869
+    
+    This revert seems like it caused test failures in FileSystemApiOpenBackgroundTest and
+    FileSystemApiSaveBackgroundTest on linux.
+    
+    http://build.chromium.org/p/chromium.linux/builders/Linux%20Tests%20%28dbg%29%281%29/builds/23657
+    
+    In particular, this change could change the security level of background pages (pages with no
+    web contents), and therefore seems to be a reasonable culprit.
+    
+    Apologies if this turns out to be misdirected.  We've been starting at these red bots (on linux
+    and chromeos, e.g., http://build.chromium.org/p/chromium.chromiumos/builders/Linux%20ChromiumOS%20Tests%20%282%29/builds/12033 )
+    for a while now.  We even rolled about another change in the same blamelist, but that
+    didn't appear to help, possibly even made things worse.
+    
+    > Expose the utility for getting the SecurityLevel for any WebContents.
+    >
+    > On android, we need handle rendering more than one location bar for a
+    > given "window" so the ability to query the security level without updating
+    > the concept of the active WebContents to the toolbar model.
+    >
+    > BUG=
+    >
+    >
+    > Review URL: https://chromiumcodereview.appspot.com/12314119
+    
+    TBR=tedchoc@chromium.org
+    Review URL: https://codereview.chromium.org/12334129
+    
+    git-svn-id: svn://svn.chromium.org/chrome/trunk/src@184999 0039d316-1c4b-4281-b951-d872f2087c98
+
+diff --git a/chrome/browser/ui/toolbar/toolbar_model_impl.cc b/chrome/browser/ui/toolbar/toolbar_model_impl.cc
+index 37b47c4..04c6f3a4 100644
+--- a/chrome/browser/ui/toolbar/toolbar_model_impl.cc
++++ b/chrome/browser/ui/toolbar/toolbar_model_impl.cc
+@@ -47,42 +47,6 @@ ToolbarModelImpl::ToolbarModelImpl(ToolbarModelDelegate* delegate)
+ ToolbarModelImpl::~ToolbarModelImpl() {
+ }
+ 
+-ToolbarModel::SecurityLevel ToolbarModelImpl::GetSecurityLevelForWebContents(
+-      content::WebContents* web_contents) {
+-  if (!web_contents)
+-    return NONE;
+-
+-  NavigationEntry* entry = web_contents->GetController().GetVisibleEntry();
+-  if (!entry)
+-    return NONE;
+-
+-  const SSLStatus& ssl = entry->GetSSL();
+-  switch (ssl.security_style) {
+-    case content::SECURITY_STYLE_UNKNOWN:
+-    case content::SECURITY_STYLE_UNAUTHENTICATED:
+-      return NONE;
+-
+-    case content::SECURITY_STYLE_AUTHENTICATION_BROKEN:
+-      return SECURITY_ERROR;
+-
+-    case content::SECURITY_STYLE_AUTHENTICATED:
+-      if (!!(ssl.content_status & SSLStatus::DISPLAYED_INSECURE_CONTENT))
+-        return SECURITY_WARNING;
+-      if (net::IsCertStatusError(ssl.cert_status)) {
+-        DCHECK(net::IsCertStatusMinorError(ssl.cert_status));
+-        return SECURITY_WARNING;
+-      }
+-      if ((ssl.cert_status & net::CERT_STATUS_IS_EV) &&
+-          content::CertStore::GetInstance()->RetrieveCert(ssl.cert_id, NULL))
+-        return EV_SECURE;
+-      return SECURE;
+-
+-    default:
+-      NOTREACHED();
+-      return NONE;
+-  }
+-}
+-
+ // ToolbarModelImpl Implementation.
+ string16 ToolbarModelImpl::GetText(
+     bool display_search_urls_as_search_terms) const {
+@@ -157,11 +121,43 @@ bool ToolbarModelImpl::ShouldDisplayURL() const {
+   return true;
+ }
+ 
+-ToolbarModel::SecurityLevel ToolbarModelImpl::GetSecurityLevel() const {
++ToolbarModelImpl::SecurityLevel ToolbarModelImpl::GetSecurityLevel() const {
+   if (input_in_progress_)  // When editing, assume no security style.
+     return NONE;
+ 
+-  return GetSecurityLevelForWebContents(delegate_->GetActiveWebContents());
++  NavigationController* navigation_controller = GetNavigationController();
++  if (!navigation_controller)  // We might not have a controller on init.
++    return NONE;
++
++  NavigationEntry* entry = navigation_controller->GetVisibleEntry();
++  if (!entry)
++    return NONE;
++
++  const SSLStatus& ssl = entry->GetSSL();
++  switch (ssl.security_style) {
++    case content::SECURITY_STYLE_UNKNOWN:
++    case content::SECURITY_STYLE_UNAUTHENTICATED:
++      return NONE;
++
++    case content::SECURITY_STYLE_AUTHENTICATION_BROKEN:
++      return SECURITY_ERROR;
++
++    case content::SECURITY_STYLE_AUTHENTICATED:
++      if (!!(ssl.content_status & SSLStatus::DISPLAYED_INSECURE_CONTENT))
++        return SECURITY_WARNING;
++      if (net::IsCertStatusError(ssl.cert_status)) {
++        DCHECK(net::IsCertStatusMinorError(ssl.cert_status));
++        return SECURITY_WARNING;
++      }
++      if ((ssl.cert_status & net::CERT_STATUS_IS_EV) &&
++          content::CertStore::GetInstance()->RetrieveCert(ssl.cert_id, NULL))
++        return EV_SECURE;
++      return SECURE;
++
++    default:
++      NOTREACHED();
++      return NONE;
++  }
+ }
+ 
+ int ToolbarModelImpl::GetIcon() const {
+diff --git a/chrome/browser/ui/toolbar/toolbar_model_impl.h b/chrome/browser/ui/toolbar/toolbar_model_impl.h
+index 1adf474..91843a7 100644
+--- a/chrome/browser/ui/toolbar/toolbar_model_impl.h
++++ b/chrome/browser/ui/toolbar/toolbar_model_impl.h
+@@ -18,7 +18,6 @@ class ToolbarModelDelegate;
+ 
+ namespace content {
+ class NavigationController;
+-class WebContents;
+ }
+ 
+ namespace net {
+@@ -33,9 +32,6 @@ class ToolbarModelImpl : public ToolbarModel {
+   explicit ToolbarModelImpl(ToolbarModelDelegate* delegate);
+   virtual ~ToolbarModelImpl();
+ 
+-  static SecurityLevel GetSecurityLevelForWebContents(
+-      content::WebContents* web_contents);
+-
+   // Overriden from ToolbarModel.
+   virtual string16 GetText(
+       bool display_search_urls_as_search_terms) const OVERRIDE;
+
+commit 5cef23d337bf13f96bc932e0536d5ef5ffd2b713
+Author: jochen@chromium.org <jochen@chromium.org@0039d316-1c4b-4281-b951-d872f2087c98>
+Date:   Wed Feb 27 13:11:21 2013 +0000
+
+    Do not set the main frame's name to the frame name parameter of createView
+    
+    If e.g. a link has target=_blank, createView is invoked with a frame name
+    parameter "_blank". However, WebCore assumes that no frame ever has the name
+    _blank (see e.g. FrameTree::find).
+    
+    BUG=177982,111316
+    R=darin@chromium.org
+    TEST=e.g. http/tests/security/mixedContent tests pass on content_shell
+    
+    
+    Review URL: https://chromiumcodereview.appspot.com/12313090
+    
+    git-svn-id: svn://svn.chromium.org/chrome/trunk/src@184941 0039d316-1c4b-4281-b951-d872f2087c98
+
+diff --git a/content/renderer/render_view_impl.cc b/content/renderer/render_view_impl.cc
+index 8b3f021..7983f7a 100644
+--- a/content/renderer/render_view_impl.cc
++++ b/content/renderer/render_view_impl.cc
+@@ -1917,7 +1917,8 @@ WebView* RenderViewImpl::createView(
+   params.user_gesture = creator->isProcessingUserGesture();
+   params.window_container_type = WindowFeaturesToContainerType(features);
+   params.session_storage_namespace_id = session_storage_namespace_id_;
+-  params.frame_name = frame_name;
++  if (frame_name != "_blank")
++    params.frame_name = frame_name;
+   params.opener_frame_id = creator->identifier();
+   params.opener_url = creator->document().url();
+   GURL security_url(creator->document().securityOrigin().toString().utf8());
+@@ -1951,7 +1952,7 @@ WebView* RenderViewImpl::createView(
+       routing_id,
+       surface_id,
+       cloned_session_storage_namespace_id,
+-      frame_name,
++      string16(),  // WebCore will take care of setting the correct name.
+       true,
+       false,
+       1,
+
+commit 72cb675846bd4947910e8a3d5fd8dad315038c90
+Author: tedchoc@chromium.org <tedchoc@chromium.org@0039d316-1c4b-4281-b951-d872f2087c98>
+Date:   Wed Feb 27 04:15:17 2013 +0000
+
+    Expose the utility for getting the SecurityLevel for any WebContents.
+    
+    On android, we need handle rendering more than one location bar for a
+    given "window" so the ability to query the security level without updating
+    the concept of the active WebContents to the toolbar model.
+    
+    BUG=
+    
+    
+    Review URL: https://chromiumcodereview.appspot.com/12314119
+    
+    git-svn-id: svn://svn.chromium.org/chrome/trunk/src@184869 0039d316-1c4b-4281-b951-d872f2087c98
+
+diff --git a/chrome/browser/ui/toolbar/toolbar_model_impl.cc b/chrome/browser/ui/toolbar/toolbar_model_impl.cc
+index 04c6f3a4..37b47c4 100644
+--- a/chrome/browser/ui/toolbar/toolbar_model_impl.cc
++++ b/chrome/browser/ui/toolbar/toolbar_model_impl.cc
+@@ -47,6 +47,42 @@ ToolbarModelImpl::ToolbarModelImpl(ToolbarModelDelegate* delegate)
+ ToolbarModelImpl::~ToolbarModelImpl() {
+ }
+ 
++ToolbarModel::SecurityLevel ToolbarModelImpl::GetSecurityLevelForWebContents(
++      content::WebContents* web_contents) {
++  if (!web_contents)
++    return NONE;
++
++  NavigationEntry* entry = web_contents->GetController().GetVisibleEntry();
++  if (!entry)
++    return NONE;
++
++  const SSLStatus& ssl = entry->GetSSL();
++  switch (ssl.security_style) {
++    case content::SECURITY_STYLE_UNKNOWN:
++    case content::SECURITY_STYLE_UNAUTHENTICATED:
++      return NONE;
++
++    case content::SECURITY_STYLE_AUTHENTICATION_BROKEN:
++      return SECURITY_ERROR;
++
++    case content::SECURITY_STYLE_AUTHENTICATED:
++      if (!!(ssl.content_status & SSLStatus::DISPLAYED_INSECURE_CONTENT))
++        return SECURITY_WARNING;
++      if (net::IsCertStatusError(ssl.cert_status)) {
++        DCHECK(net::IsCertStatusMinorError(ssl.cert_status));
++        return SECURITY_WARNING;
++      }
++      if ((ssl.cert_status & net::CERT_STATUS_IS_EV) &&
++          content::CertStore::GetInstance()->RetrieveCert(ssl.cert_id, NULL))
++        return EV_SECURE;
++      return SECURE;
++
++    default:
++      NOTREACHED();
++      return NONE;
++  }
++}
++
+ // ToolbarModelImpl Implementation.
+ string16 ToolbarModelImpl::GetText(
+     bool display_search_urls_as_search_terms) const {
+@@ -121,43 +157,11 @@ bool ToolbarModelImpl::ShouldDisplayURL() const {
+   return true;
+ }
+ 
+-ToolbarModelImpl::SecurityLevel ToolbarModelImpl::GetSecurityLevel() const {
++ToolbarModel::SecurityLevel ToolbarModelImpl::GetSecurityLevel() const {
+   if (input_in_progress_)  // When editing, assume no security style.
+     return NONE;
+ 
+-  NavigationController* navigation_controller = GetNavigationController();
+-  if (!navigation_controller)  // We might not have a controller on init.
+-    return NONE;
+-
+-  NavigationEntry* entry = navigation_controller->GetVisibleEntry();
+-  if (!entry)
+-    return NONE;
+-
+-  const SSLStatus& ssl = entry->GetSSL();
+-  switch (ssl.security_style) {
+-    case content::SECURITY_STYLE_UNKNOWN:
+-    case content::SECURITY_STYLE_UNAUTHENTICATED:
+-      return NONE;
+-
+-    case content::SECURITY_STYLE_AUTHENTICATION_BROKEN:
+-      return SECURITY_ERROR;
+-
+-    case content::SECURITY_STYLE_AUTHENTICATED:
+-      if (!!(ssl.content_status & SSLStatus::DISPLAYED_INSECURE_CONTENT))
+-        return SECURITY_WARNING;
+-      if (net::IsCertStatusError(ssl.cert_status)) {
+-        DCHECK(net::IsCertStatusMinorError(ssl.cert_status));
+-        return SECURITY_WARNING;
+-      }
+-      if ((ssl.cert_status & net::CERT_STATUS_IS_EV) &&
+-          content::CertStore::GetInstance()->RetrieveCert(ssl.cert_id, NULL))
+-        return EV_SECURE;
+-      return SECURE;
+-
+-    default:
+-      NOTREACHED();
+-      return NONE;
+-  }
++  return GetSecurityLevelForWebContents(delegate_->GetActiveWebContents());
+ }
+ 
+ int ToolbarModelImpl::GetIcon() const {
+diff --git a/chrome/browser/ui/toolbar/toolbar_model_impl.h b/chrome/browser/ui/toolbar/toolbar_model_impl.h
+index 91843a7..1adf474 100644
+--- a/chrome/browser/ui/toolbar/toolbar_model_impl.h
++++ b/chrome/browser/ui/toolbar/toolbar_model_impl.h
+@@ -18,6 +18,7 @@ class ToolbarModelDelegate;
+ 
+ namespace content {
+ class NavigationController;
++class WebContents;
+ }
+ 
+ namespace net {
+@@ -32,6 +33,9 @@ class ToolbarModelImpl : public ToolbarModel {
+   explicit ToolbarModelImpl(ToolbarModelDelegate* delegate);
+   virtual ~ToolbarModelImpl();
+ 
++  static SecurityLevel GetSecurityLevelForWebContents(
++      content::WebContents* web_contents);
++
+   // Overriden from ToolbarModel.
+   virtual string16 GetText(
+       bool display_search_urls_as_search_terms) const OVERRIDE;
+
+commit 98b5eef7d47215a318634daa9cbc411dae2ecf71
+Author: msw@chromium.org <msw@chromium.org@0039d316-1c4b-4281-b951-d872f2087c98>
+Date:   Sat Feb 23 18:09:24 2013 +0000
+
+    Fix Views Omnibox diagonal strike styling.
+    
+    Clear the diagonal strike style (before potentially applying URL security styling).
+    
+    This was a simple regression from my http://crrev.com/180067
+    OmniboxViewViews previously cleared the diagonal strike style in line 919 of:
+    https://chromiumcodereview.appspot.com/11535014/diff/57050/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
+    ApplyURLStyle(textfield_, 0, text.length(), base_color, false);
+    My change still reset the overall textfield color, but not the diagonal strike style.
+    
+    BUG=177082
+    TEST=Get SSL error (https://cacert.org), new tab, switch back to SSL error tab; only scheme has a strike.
+    R=pkasting@chromium.org
+    
+    Review URL: https://chromiumcodereview.appspot.com/12315027
+    
+    git-svn-id: svn://svn.chromium.org/chrome/trunk/src@184322 0039d316-1c4b-4281-b951-d872f2087c98
+
+diff --git a/chrome/browser/ui/views/omnibox/omnibox_view_views.cc b/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
+index 785d0fd..0edcdad 100644
+--- a/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
++++ b/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
+@@ -796,6 +796,7 @@ void OmniboxViewViews::EmphasizeURLComponents() {
+   // URLs with search terms, we may have a non-URL even when the user is not
+   // editing; and in some cases, e.g. for "site:foo.com" searches, the parser
+   // may have incorrectly identified a qualifier as a scheme.
++  SetStyle(gfx::DIAGONAL_STRIKE, false);
+   if (!model()->user_input_in_progress() && model()->CurrentTextIsURL() &&
+       scheme.is_nonempty() && (security_level_ != ToolbarModel::NONE)) {
+     SkColor security_color = location_bar_view_->GetColor(
+
+commit 274df279ad39b91bd21923d182fe4318e9de24c4
+Author: mmenke@chromium.org <mmenke@chromium.org@0039d316-1c4b-4281-b951-d872f2087c98>
+Date:   Sat Feb 23 01:08:03 2013 +0000
+
+    Fix a pair of bugs that broke exporting from about:profiler.
+    
+    1)  Fix use of undefined variable.
+    2)  The content security policy doesn't allow changing the src
+    of an iframe, so switch to using an anchor to start the download.
+    
+    R=eroman@chromium.org
+    BUG=177778
+    
+    Review URL: https://chromiumcodereview.appspot.com/12340034
+    
+    git-svn-id: svn://svn.chromium.org/chrome/trunk/src@184244 0039d316-1c4b-4281-b951-d872f2087c98
+
+diff --git a/chrome/browser/resources/profiler/profiler.html b/chrome/browser/resources/profiler/profiler.html
+index b8c831f..4a5e5fc 100644
+--- a/chrome/browser/resources/profiler/profiler.html
++++ b/chrome/browser/resources/profiler/profiler.html
+@@ -151,6 +151,6 @@ table.results-table,
+        which will eventually be superceded by snapshotting -->
+   <span id=reset-data-link class=pseudo-link>[Reset tracking data]</span>
+ 
+-  <iframe style="display: none" id="download-iframe"></iframe>
++  <a style="display: none" id="download-anchor" download="profile.json"></a>
+ </body>
+ </html>
+diff --git a/chrome/browser/resources/profiler/profiler.js b/chrome/browser/resources/profiler/profiler.js
+index c82617c..baf6071 100644
+--- a/chrome/browser/resources/profiler/profiler.js
++++ b/chrome/browser/resources/profiler/profiler.js
+@@ -110,7 +110,7 @@ var MainView = (function() {
+   var SNAPSHOT_FILE_LOADER_ID = 'snapshot-file-loader';
+   var LOAD_ERROR_ID = 'file-load-error';
+ 
+-  var DOWNLOAD_IFRAME_ID = 'download-iframe';
++  var DOWNLOAD_ANCHOR_ID = 'download-anchor';
+ 
+   // --------------------------------------------------------------------------
+   // Row keys
+@@ -1799,9 +1799,10 @@ var MainView = (function() {
+       };
+ 
+       var dumpText = JSON.stringify(dump, null, ' ');
+-      var blobBuilder = new Blob([dumpText, 'native'], {type: 'octet/stream'});
++      var textBlob = new Blob([dumpText, 'native'], { type: 'octet/stream' });
+       var blobUrl = window.webkitURL.createObjectURL(textBlob);
+-      $(DOWNLOAD_IFRAME_ID).src = blobUrl;
++      $(DOWNLOAD_ANCHOR_ID).href = blobUrl;
++      $(DOWNLOAD_ANCHOR_ID).click();
+     },
+ 
+     loadFileChanged_: function() {
+
+commit 48c3fb43e7c08f68283204d697a63ebc970468a9
+Author: tedchoc@chromium.org <tedchoc@chromium.org@0039d316-1c4b-4281-b951-d872f2087c98>
+Date:   Fri Feb 22 03:49:37 2013 +0000
+
+    Start using ToolbarModel in android for consistent SSL security processing.
+    
+    BUG=174361
+    TBR=thakis@chromium.org # for chrome_browser_ui.gypi
+    
+    Review URL: https://chromiumcodereview.appspot.com/12316054
+    
+    git-svn-id: svn://svn.chromium.org/chrome/trunk/src@184007 0039d316-1c4b-4281-b951-d872f2087c98
+
+diff --git a/chrome/browser/ui/android/tab_model/tab_model.cc b/chrome/browser/ui/android/tab_model/tab_model.cc
+index 5ec84d7..7bd5d73 100644
+--- a/chrome/browser/ui/android/tab_model/tab_model.cc
++++ b/chrome/browser/ui/android/tab_model/tab_model.cc
+@@ -8,6 +8,7 @@
+ #include "chrome/browser/browser_process.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/sync/glue/synced_window_delegate_android.h"
++#include "chrome/browser/ui/toolbar/toolbar_model_impl.h"
+ #include "chrome/common/chrome_notification_types.h"
+ #include "content/public/browser/notification_service.h"
+ 
+@@ -16,7 +17,8 @@ using content::NotificationService;
+ TabModel::TabModel(Profile* profile)
+   : profile_(profile),
+     synced_window_delegate_(
+-        new browser_sync::SyncedWindowDelegateAndroid(this)) {
++        new browser_sync::SyncedWindowDelegateAndroid(this)),
++    toolbar_model_(new ToolbarModelImpl(this)) {
+ 
+   if (profile) {
+     // A normal Profile creates an OTR profile if it does not exist when
+@@ -46,6 +48,13 @@ TabModel::TabModel()
+ TabModel::~TabModel() {
+ }
+ 
++content::WebContents* TabModel::GetActiveWebContents() const {
++  if (GetTabCount() == 0 || GetActiveIndex() < 0 ||
++      GetActiveIndex() > GetTabCount())
++    return NULL;
++  return GetWebContentsAt(GetActiveIndex());
++}
++
+ Profile* TabModel::GetProfile() const {
+   return profile_;
+ }
+@@ -75,6 +84,14 @@ void TabModel::BroadcastSessionRestoreComplete() {
+   }
+ }
+ 
++ToolbarModel* TabModel::GetToolbarModel() {
++  return toolbar_model_.get();
++}
++
++ToolbarModel::SecurityLevel TabModel::GetSecurityLevelForCurrentTab() {
++  return toolbar_model_->GetSecurityLevel();
++}
++
+ void TabModel::Observe(
+     int type,
+     const content::NotificationSource& source,
+diff --git a/chrome/browser/ui/android/tab_model/tab_model.h b/chrome/browser/ui/android/tab_model/tab_model.h
+index 274443e..dc2a002 100644
+--- a/chrome/browser/ui/android/tab_model/tab_model.h
++++ b/chrome/browser/ui/android/tab_model/tab_model.h
+@@ -7,6 +7,8 @@
+ 
+ #include "base/memory/scoped_ptr.h"
+ #include "chrome/browser/sessions/session_id.h"
++#include "chrome/browser/ui/toolbar/toolbar_model.h"
++#include "chrome/browser/ui/toolbar/toolbar_model_delegate.h"
+ #include "content/public/browser/notification_observer.h"
+ #include "content/public/browser/notification_registrar.h"
+ 
+@@ -24,7 +26,8 @@ class Profile;
+ // Abstract representation of a Tab Model for Android.  Since Android does
+ // not use Browser/BrowserList, this is required to allow Chrome to interact
+ // with Android's Tabs and Tab Model.
+-class TabModel : public content::NotificationObserver {
++class TabModel : public content::NotificationObserver,
++                 public ToolbarModelDelegate {
+  public:
+   explicit TabModel(Profile* profile);
+   // Deprecated: This constructor is deprecated and should be removed once
+@@ -32,6 +35,9 @@ class TabModel : public content::NotificationObserver {
+   TabModel();
+   virtual ~TabModel();
+ 
++  // Implementation of ToolbarDelegate
++  virtual content::WebContents* GetActiveWebContents() const OVERRIDE;
++
+   virtual Profile* GetProfile() const;
+   virtual bool IsOffTheRecord() const;
+   virtual browser_sync::SyncedWindowDelegate* GetSyncedWindowDelegate() const;
+@@ -50,11 +56,15 @@ class TabModel : public content::NotificationObserver {
+ 
+   virtual void OpenClearBrowsingData() const = 0;
+ 
++  ToolbarModel::SecurityLevel GetSecurityLevelForCurrentTab();
++
+  protected:
+   // Instructs the TabModel to broadcast a notification that all tabs are now
+   // loaded from storage.
+   void BroadcastSessionRestoreComplete();
+ 
++  ToolbarModel* GetToolbarModel();
++
+  private:
+   // Determines how TabModel will interact with the profile.
+   virtual void Observe(int type,
+@@ -70,6 +80,8 @@ class TabModel : public content::NotificationObserver {
+   // The SyncedWindowDelegate associated with this TabModel.
+   scoped_ptr<browser_sync::SyncedWindowDelegateAndroid> synced_window_delegate_;
+ 
++  scoped_ptr<ToolbarModel> toolbar_model_;
++
+   // Unique identifier of this TabModel for session restore. This id is only
+   // unique within the current session, and is not guaranteed to be unique
+   // across sessions.
+diff --git a/chrome/chrome_browser_ui.gypi b/chrome/chrome_browser_ui.gypi
+index 4ab8787..93ee755 100644
+--- a/chrome/chrome_browser_ui.gypi
++++ b/chrome/chrome_browser_ui.gypi
+@@ -2622,6 +2622,9 @@
+             ['exclude', '^browser/ui/startup/'],
+             ['exclude', '^browser/ui/tabs/'],
+             ['exclude', '^browser/ui/toolbar/'],
++            ['include', '^browser/ui/toolbar/toolbar_model\\.(cc|h)$'],
++            ['include', '^browser/ui/toolbar/toolbar_model_delegate\\.(cc|h)$'],
++            ['include', '^browser/ui/toolbar/toolbar_model_impl\\.(cc|h)$'],
+             ['exclude', '^browser/ui/webui/downloads_'],
+             ['exclude', '^browser/ui/webui/feedback_'],
+             ['exclude', '^browser/ui/webui/help/'],
+
+commit 549c238c049ea78dd634d2b63c4b6517e579c092
+Author: cevans@chromium.org <cevans@chromium.org@0039d316-1c4b-4281-b951-d872f2087c98>
+Date:   Thu Feb 21 02:35:10 2013 +0000
+
+    Update Java version metadata for Feb 2013 CPU.
+    http://www.oracle.com/technetwork/topics/security/javacpufeb2013update-1905892.html
+    
+    BUG=177152
+    Review URL: https://codereview.chromium.org/12321004
+    
+    git-svn-id: svn://svn.chromium.org/chrome/trunk/src@183720 0039d316-1c4b-4281-b951-d872f2087c98
+
+diff --git a/chrome/browser/resources/plugin_metadata/plugins_linux.json b/chrome/browser/resources/plugin_metadata/plugins_linux.json
+index b2b8c0f..d94ea31 100644
+--- a/chrome/browser/resources/plugin_metadata/plugins_linux.json
++++ b/chrome/browser/resources/plugin_metadata/plugins_linux.json
+@@ -1,5 +1,5 @@
+ {
+-  "x-version": 1,
++  "x-version": 2,
+   "google-talk": {
+     "mime_types": [
+     ],
+@@ -51,7 +51,7 @@
+     ],
+     "versions": [
+       {
+-        "version": "1.6.0.39",
++        "version": "1.6.0.41",
+         "status": "requires_authorization"
+       },
+       {
+@@ -59,7 +59,7 @@
+         "status": "out_of_date"
+       },
+       {
+-        "version": "1.7.0.13",
++        "version": "1.7.0.15",
+         "status": "requires_authorization"
+       }
+     ],
+diff --git a/chrome/browser/resources/plugin_metadata/plugins_win.json b/chrome/browser/resources/plugin_metadata/plugins_win.json
+index 8066f41..52411f2 100644
+--- a/chrome/browser/resources/plugin_metadata/plugins_win.json
++++ b/chrome/browser/resources/plugin_metadata/plugins_win.json
+@@ -1,5 +1,5 @@
+ {
+-  "x-version": 1,
++  "x-version": 2,
+   "google-talk": {
+     "mime_types": [
+     ],
+@@ -54,18 +54,18 @@
+     ],
+     "versions": [
+       {
+-        "version": "6.0.390",
++        "version": "6.0.410",
+         "status": "requires_authorization",
+-        "comment": "Java SE 6 Update 39. '390' is not a typo."
++        "comment": "Java SE 6 Update 41. '410' is not a typo."
+       },
+       {
+         "version": "7",
+         "status": "out_of_date"
+       },
+       {
+-        "version": "10.13",
++        "version": "10.15",
+         "status": "requires_authorization",
+-        "comment": "Java SE 7u13"
++        "comment": "Java SE 7u15"
+       }
+     ],
+     "lang": "en-US",

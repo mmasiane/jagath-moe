@@ -1,0 +1,95 @@
+commit 69257ba3244e17812a162c976526909ab8bb23db
+Author: mseaborn@chromium.org <mseaborn@chromium.org@0039d316-1c4b-4281-b951-d872f2087c98>
+Date:   Fri Nov 11 19:02:43 2011 +0000
+
+    NaCl: Update revision in DEPS, r7115 -> r7139
+    
+    This pulls in the following Native Client changes:
+    
+    r7116: (krasin) Remove obsolete call to AddBiasForPNaCl.
+    r7117: (krasin) Revert 7116 - Remove obsolete call to AddBiasForPNaCl.
+    r7118: (pdox) Remove weak references from IRT startup code as well.
+    r7119: (robertm) Cleanup of scons compile/link command line generation.
+    r7120: (robertm) Cleanup arm trusted TC integration.
+    r7121: (bsy) fixed broken sysbrk tests.
+    r7122: (bsy) changed the fault injection library to avoid _declspec(thread) for windows.
+    r7123: (krasin) Enable ppapi audio test on ARM.
+    r7124: (robertm) Removed some debug statements and one line of dead code that went in:
+    r7125: (dspringer) Only build a static version of libnacl.a.
+    r7126: (mseaborn) Windows: Partly fix potential vulnerability from mmap hole race condition
+    r7127: (robertm) Fix problem where shared libs in arm trusted builds were built with -static
+    r7128: (mcgrathr) Update chrome_rev
+    r7129: (robertm) Switch arm trusted builds to -macrch=armv7-a.
+    r7130: (krasin) Remove obsolete call to AddBiasForPNaCl.
+    r7131: (noelallen) Add missing defines in untrusted.gypi needed by Chrome.
+    r7132: (ncbray) Tune the browser tester's timeouts to make it easier to diagnose load failiures.
+    r7133: (noelallen) Update GYP build to support 'empty' crt_platform library.
+    r7134: (noelallen) Whitespace change to force rebuild on Chrome builders
+    r7135: (noelallen) Add tracking of libraries for untrusted builds.
+    r7136: (noelallen) Add missing dependency on nacl_lib
+    r7137: (noelallen) Trivial change adds dependency on build_nexe.py ppapi_cpp.gypi for nexes.
+    r7139: (robertm) This is the new (experimental) version of the arm trusted TC creator.
+    
+    BUG=none
+    TEST=nacl_integration
+    
+    Review URL: http://codereview.chromium.org/8528002
+    
+    git-svn-id: svn://svn.chromium.org/chrome/trunk/src@109663 0039d316-1c4b-4281-b951-d872f2087c98
+
+commit 919ebeb236a38c876711c20b8807c59512c702d4
+Author: mdm@chromium.org <mdm@chromium.org@0039d316-1c4b-4281-b951-d872f2087c98>
+Date:   Thu Jun 23 18:18:16 2011 +0000
+
+    Linux: remove the forced keyring unlock on password store initialization.
+    It is no longer required for our gnome keyring integration to work correctly.
+    
+    This has the side effect of avoiding an unlock prompt unless a login form would
+    actually be filled in by data in the keyring, lessening phishing vulnerability.
+    
+    In order to make this work correctly, we also have to be a little more careful
+    about when we commit to using the keyring instead of the built-in store. In
+    particular, because it can succeed without unlocking when there is no data to
+    return (which is good, and avoids unexpected unlock prompts), we must require
+    that we actually got some data before assuming that we can use the keyring.
+    
+    Note that we don't need to do any sort of merging or fall back to the built-in
+    store in these cases, because we know it's empty - if it had any data in it, we
+    would have migrated it, and we wouldn't be in this undecided state to begin
+    with.
+    
+    This subtlety is probably the cause of some old repeated-unlock-prompt bugs
+    that were masked by the unlock forcing. (Which was part of its point.)
+    
+    BUG=85285
+    Review URL: http://codereview.chromium.org/7189001
+    
+    git-svn-id: svn://svn.chromium.org/chrome/trunk/src@90235 0039d316-1c4b-4281-b951-d872f2087c98
+
+commit 4e044185044bbb85ff6e4f08911a0b546436fc50
+Author: mseaborn@chromium.org <mseaborn@chromium.org@0039d316-1c4b-4281-b951-d872f2087c98>
+Date:   Wed Apr 6 06:00:13 2011 +0000
+
+    Disable registration of Breakpad's signal handler for Native Client
+    
+    This partially undoes r71459.
+    
+    This fixes a security vulnerability that occurs when the NaCl revision
+    is updated to r4598 or later.  That revision changes NaCl's
+    sel_main_chrome.c so that it no longer registers a signal handler, but
+    instead leaves Breakpad's signal handler (registered by Chrome) in
+    place.
+    
+    The vulnerability would allow NaCl untrusted code to escape NaCl's
+    inner sandbox on x86-32 Linux.
+    
+    This is because although NaCl's signal handler knows how to safely
+    handle faults from NaCl x86-32 sandboxed code, Breakpad's signal
+    handler does not.  Breakpad's signal handler does not restore %gs.
+    
+    BUG=http://code.google.com/p/nativeclient/issues/detail?id=1607
+    TEST=assertion to be added on the NaCl side (http://codereview.chromium.org/6798008/)
+    
+    Review URL: http://codereview.chromium.org/6677168
+    
+    git-svn-id: svn://svn.chromium.org/chrome/trunk/src@80581 0039d316-1c4b-4281-b951-d872f2087c98

@@ -1,0 +1,64 @@
+jagsi@jagsi-PC MINGW64 ~/Documents/Virginia Tech/Software Engineering/Project/netty (4.1)
+$ git log --all --grep="security";
+commit 1d061bbb27ca32995d2bf46c0385296889be4c35
+Author: Trustin Lee <t@motd.kr>
+Date:   Tue Mar 17 17:23:30 2015 +0900
+
+    Hide password in exception messages of SocksAuthRequest
+
+    Related: #3504
+
+    Motivation:
+
+    There are two places in the SocksAuthRequest constructor where an
+    IllegalArgumentException is thrown with a password as part of the
+    exception message.
+
+    This constitutes mishandling of confidential information, which can
+    compromise user privacy and is flagged as critical by security scanners.
+
+    Modifications:
+
+    Mask the password in the exception messages
+
+    Result:
+
+    No unexpected password leak
+
+commit 9091e66e15e2b4e8ddc61d88177a5cbe34d24c15
+Author: Trustin Lee <t@motd.kr>
+Date:   Tue Mar 17 17:23:30 2015 +0900
+
+    Hide password in exception messages of SocksAuthRequest
+
+    Related: #3504
+
+    Motivation:
+
+    There are two places in the SocksAuthRequest constructor where an
+    IllegalArgumentException is thrown with a password as part of the
+    exception message.
+
+    This constitutes mishandling of confidential information, which can
+    compromise user privacy and is flagged as critical by security scanners.
+
+    Modifications:
+
+    Mask the password in the exception messages
+
+    Result:
+
+    No unexpected password leak
+
+commit faf1d90ae7b92ab5577daaa9feeb7f0b8b099dcc
+Author: Trustin Lee <t@motd.kr>
+Date:   Tue Mar 17 17:21:30 2015 +0900
+
+    Hide password in exception messages of SocksAuthRequest
+
+    Related: #3504
+
+    Motivation:
+
+    There are two places in the SocksAuthRequest constructor where an
+:
