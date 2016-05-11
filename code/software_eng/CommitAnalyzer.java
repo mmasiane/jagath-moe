@@ -56,7 +56,7 @@ public class CommitAnalyzer {
 		CommitAnalyzer myCommitAnalyzer = new CommitAnalyzer();
 		
 		try{
-			BufferedReader file = new BufferedReader(new FileReader("C:/Users/Moeti/workspace/CommitAnalyzer/src/software_eng/commits-sample-chromium-withdiff.txt"));
+			BufferedReader file = new BufferedReader(new FileReader("C:/Users/Moeti/workspace/CommitAnalyzer/src/software_eng/commits-chromium-withdiff.txt"));
 			line = file.readLine();
 			while(line!=null){
 				if (!line.trim().isEmpty()){
